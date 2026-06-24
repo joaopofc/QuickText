@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, RotateCcw, FileText, Check, Search, Trash2 } from 'lucide-react';
+import { Plus, RotateCcw, FileText, Check, Search, Trash2, Download } from 'lucide-react';
 import { Template } from './types';
 import { DEFAULT_TEMPLATES, AVAILABLE_CATEGORIES } from './defaultTemplates';
 import { extractVariables } from './utils/templateHelpers';
@@ -9,6 +9,7 @@ import TemplateForm from './components/TemplateForm';
 import QuickFillModal from './components/QuickFillModal';
 import ConfirmModal from './components/ConfirmModal';
 import PrivacyTermsModal from './components/PrivacyTermsModal';
+import ImportExportModal from './components/ImportExportModal';
 
 export default function App() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -18,6 +19,7 @@ export default function App() {
   const [activeQuickFill, setActiveQuickFill] = useState<Template | null>(null);
   const [globalCopiedAlert, setGlobalCopiedAlert] = useState<string | null>(null);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   
   // Custom confirmation modal states (replaces blocked window.confirm in iframe)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -135,6 +137,25 @@ export default function App() {
     setTimeout(() => setGlobalCopiedAlert(null), 2000);
   };
 
+  // Handle importing data (either merges with current or overwrites)
+  const handleImport = (importedTemplates: Template[], overwrite: boolean) => {
+    if (overwrite) {
+      saveTemplates(importedTemplates);
+    } else {
+      // Merge: Avoid duplicating templates with exact same title and content
+      const existingKeys = new Set(templates.map(t => `${t.title.trim().toLowerCase()}::${t.content.trim()}`));
+      const merged = [...templates];
+      
+      importedTemplates.forEach(item => {
+        const key = `${item.title.trim().toLowerCase()}::${item.content.trim()}`;
+        if (!existingKeys.has(key)) {
+          merged.push(item);
+        }
+      });
+      saveTemplates(merged);
+    }
+  };
+
   // Filter templates shown in the grid based on category tab selection
   const filteredTemplates = useMemo(() => {
     if (selectedCategory === 'Todos') return templates;
@@ -145,7 +166,7 @@ export default function App() {
     <div id="main-app-container" className="min-h-screen bg-[#fafafb] flex flex-col font-sans selection:bg-black selection:text-white">
       
       {/* Stripe-style Minimal Header */}
-      <header id="app-main-header" className="border-b border-gray-100 bg-white py-4 px-6 sticky top-0 z-30 shadow-2xs">
+      <header id="app-main-header" className="border-b border-gray-100 bg-white py-4 px-6 sticky top-0 z-40 shadow-2xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           
           {/* Logo Brand */}
@@ -161,11 +182,21 @@ export default function App() {
             <button
               id="header-reset-defaults-btn"
               onClick={handleResetDefaults}
-              className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-black transition-colors flex items-center gap-1"
+              className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-black transition-colors flex items-center gap-1 cursor-pointer"
               title="Restaurar dados de exemplo"
             >
               <RotateCcw size={12} />
               <span>Amostras</span>
+            </button>
+
+            <button
+              id="header-sync-btn"
+              onClick={() => setIsImportExportOpen(true)}
+              className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-black transition-colors flex items-center gap-1 cursor-pointer"
+              title="Sincronizar, Importar ou Exportar templates"
+            >
+              <Download size={12} />
+              <span>Backup / Sincronizar</span>
             </button>
 
             <button
@@ -174,7 +205,7 @@ export default function App() {
                 setEditingTemplate(null);
                 setIsFormOpen(true);
               }}
-              className="px-3.5 py-1.5 text-xs font-bold text-white bg-black hover:bg-neutral-800 rounded-md shadow-sm transition-all duration-150 flex items-center gap-1"
+              className="px-3.5 py-1.5 text-xs font-bold text-white bg-black hover:bg-neutral-800 rounded-md shadow-sm transition-all duration-150 flex items-center gap-1 cursor-pointer"
             >
               <Plus size={13} strokeWidth={2.5} />
               <span>Novo Texto</span>
@@ -360,11 +391,18 @@ export default function App() {
         onClose={() => setIsPrivacyOpen(false)}
       />
 
+      <ImportExportModal
+        isOpen={isImportExportOpen}
+        onClose={() => setIsImportExportOpen(false)}
+        templates={templates}
+        onImport={handleImport}
+      />
+
       {/* Footer */}
       <footer id="app-main-footer" className="border-t border-gray-100 py-6 px-6 mt-16 bg-white text-center text-xs text-gray-400">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 font-mono">
           <p>
-            QuickText &copy; {new Date().getFullYear()} &mdash; Salvo localmente
+            QuickText &copy; 2026 &mdash; Tudo localmente
           </p>
           <div className="text-[10px] text-gray-400 flex items-center justify-center sm:justify-end gap-3.5">
             <button

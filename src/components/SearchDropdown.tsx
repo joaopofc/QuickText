@@ -71,7 +71,7 @@ export default function SearchDropdown({ templates, onSelect }: SearchDropdownPr
   });
 
   return (
-    <div id="search-dropdown-container" ref={dropdownRef} className="relative w-full max-w-2xl mx-auto z-40">
+    <div id="search-dropdown-container" ref={dropdownRef} className="relative w-full max-w-2xl mx-auto z-20">
       {/* Input container */}
       <div className="relative group">
         <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-black transition-colors duration-150">

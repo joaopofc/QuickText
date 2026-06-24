@@ -1,7 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Check, Sliders, Eye, RefreshCw } from 'lucide-react';
+import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables, replaceVariables, isMultilineVariable } from '../utils/templateHelpers';
+
+const isDateVariable = (name: string): boolean => {
+  const normalized = name.toLowerCase();
+  const dateKeywords = [
+    'data', 'date', 'vencimento', 'nascimento', 'dia', 'prazo', 
+    'periodo', 'admissao', 'demissao', 'validade', 'cadastro', 
+    'pagamento', 'criado', 'agenda'
+  ];
+  return dateKeywords.some(keyword => normalized.includes(keyword));
+};
+
+const formatAsDateMask = (val: string): string => {
+  // Remove all non-digits
+  const digits = val.replace(/\D/g, '');
+  const truncated = digits.slice(0, 8);
+  
+  if (truncated.length <= 2) {
+    return truncated;
+  } else if (truncated.length <= 4) {
+    return `${truncated.slice(0, 2)}/${truncated.slice(2)}`;
+  } else {
+    return `${truncated.slice(0, 2)}/${truncated.slice(2, 4)}/${truncated.slice(4)}`;
+  }
+};
 
 interface QuickFillModalProps {
   template: Template | null;
@@ -157,6 +181,17 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                       const isFilled = !!values[varName];
                       const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
                       const presets = template?.variablePresets?.[varName] || [];
+                      const isDate = isDateVariable(varName);
+
+                      const handleDateInputChange = (valName: string, rawVal: string) => {
+                        const hasLetters = /[a-zA-Z]/.test(rawVal);
+                        if (hasLetters) {
+                          handleInputChange(valName, rawVal);
+                        } else {
+                          const formatted = formatAsDateMask(rawVal);
+                          handleInputChange(valName, formatted);
+                        }
+                      };
 
                       return (
                         <div key={varName} className="space-y-1.5 group">
@@ -182,20 +217,64 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                               className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs resize-y"
                             />
                           ) : (
-                            <input
-                              id={`modal-input-${varName}`}
-                              type="text"
-                              placeholder={`Inserir valor para ${varName}...`}
-                              value={values[varName] || ''}
-                              onChange={(e) => handleInputChange(varName, e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  e.preventDefault();
-                                  handleCopy();
-                                }
-                              }}
-                              className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs"
-                            />
+                            <div className="relative flex items-center">
+                              <input
+                                id={`modal-input-${varName}`}
+                                type="text"
+                                placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                                value={values[varName] || ''}
+                                onChange={(e) => {
+                                  if (isDate) {
+                                    handleDateInputChange(varName, e.target.value);
+                                  } else {
+                                    handleInputChange(varName, e.target.value);
+                                  }
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleCopy();
+                                  }
+                                }}
+                                className={`w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs ${
+                                  isDate ? 'pr-10' : ''
+                                }`}
+                              />
+                              {isDate && (
+                                <div className="absolute right-2 flex items-center">
+                                  <input
+                                    type="date"
+                                    id={`date-picker-${varName}`}
+                                    className="sr-only"
+                                    onChange={(e) => {
+                                      const rawVal = e.target.value;
+                                      if (rawVal) {
+                                        const [year, month, day] = rawVal.split('-');
+                                        const formattedDate = `${day}/${month}/${year}`;
+                                        handleInputChange(varName, formattedDate);
+                                      }
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      const picker = document.getElementById(`date-picker-${varName}`) as HTMLInputElement;
+                                      if (picker) {
+                                        if (typeof picker.showPicker === 'function') {
+                                          picker.showPicker();
+                                        } else {
+                                          picker.click();
+                                        }
+                                      }
+                                    }}
+                                    className="p-1.5 hover:bg-gray-100 rounded text-gray-400 hover:text-black transition-colors cursor-pointer flex items-center justify-center"
+                                    title="Escolher data no calendário"
+                                  >
+                                    <Calendar size={15} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           )}
 
                           {/* Quick selection presets list if available */}

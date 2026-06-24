@@ -1,5 +1,5 @@
 {
-  "name": "Textos Padronizados",
+  "name": "QuickText",
   "description": "Ferramenta minimalista para salvar, pesquisar e copiar rapidamente trechos de texto padronizados e respostas frequentes.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
