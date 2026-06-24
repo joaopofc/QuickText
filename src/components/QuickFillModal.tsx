@@ -34,6 +34,78 @@ const formatAsDateMask = (val: string): string => {
   }
 };
 
+const parseAndFormatDate = (val: string): string => {
+  const trimmed = val.trim();
+  if (!trimmed) return '';
+
+  // 1. Try parsing YYYY[-/. ]MM[-/. ]DD or YYYY[-/. ]M[-/. ]D
+  // Note: Year must be 4 digits here to be parsed as YYYY-MM-DD
+  const ymdMatch = trimmed.match(/^(\d{4})[-/. ](\d{1,2})[-/. ](\d{1,2})$/);
+  if (ymdMatch) {
+    const year = parseInt(ymdMatch[1], 10);
+    const month = parseInt(ymdMatch[2], 10);
+    const day = parseInt(ymdMatch[3], 10);
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    }
+  }
+
+  // 2. Try parsing D[-/. ]M[-/. ]Y or DD[-/. ]MM[-/. ]YYYY or DD[-/. ]MM[-/. ]YY
+  // Note: Day and Month can be 1 or 2 digits, Year can be 2 or 4 digits.
+  const dmyMatch = trimmed.match(/^(\d{1,2})[-/. ](\d{1,2})[-/. ](\d{2,4})$/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10);
+    let year = parseInt(dmyMatch[3], 10);
+    if (dmyMatch[3].length === 2) {
+      year = year < 50 ? 2000 + year : 1900 + year;
+    }
+    if (day >= 1 && day <= 31 && month >= 1 && month <= 12) {
+      return `${String(day).padStart(2, '0')}/${String(month).padStart(2, '0')}/${year}`;
+    }
+  }
+
+  // 3. Fallback: If they typed just numbers, e.g. "21072004" (8 digits) or "2172004" (7 digits) or "210704" (6 digits)
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length === 8) {
+    const d = parseInt(digits.slice(0, 2), 10);
+    const m = parseInt(digits.slice(2, 4), 10);
+    const y = parseInt(digits.slice(4, 8), 10);
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12 && y > 1000) {
+      return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+    }
+    const y2 = parseInt(digits.slice(0, 4), 10);
+    const m2 = parseInt(digits.slice(4, 6), 10);
+    const d2 = parseInt(digits.slice(6, 8), 10);
+    if (d2 >= 1 && d2 <= 31 && m2 >= 1 && m2 <= 12 && y2 > 1000) {
+      return `${String(d2).padStart(2, '0')}/${String(m2).padStart(2, '0')}/${y2}`;
+    }
+  } else if (digits.length === 6) {
+    const d = parseInt(digits.slice(0, 2), 10);
+    const m = parseInt(digits.slice(2, 4), 10);
+    let y = parseInt(digits.slice(4, 6), 10);
+    y = y < 50 ? 2000 + y : 1900 + y;
+    if (d >= 1 && d <= 31 && m >= 1 && m <= 12) {
+      return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`;
+    }
+  } else if (digits.length === 7) {
+    const d1 = parseInt(digits.slice(0, 1), 10);
+    const m1 = parseInt(digits.slice(1, 3), 10);
+    const y1 = parseInt(digits.slice(3, 7), 10);
+    if (d1 >= 1 && d1 <= 9 && m1 >= 1 && m1 <= 12 && y1 > 1000) {
+      return `${String(d1).padStart(2, '0')}/${String(m1).padStart(2, '0')}/${y1}`;
+    }
+    const d2 = parseInt(digits.slice(0, 2), 10);
+    const m2 = parseInt(digits.slice(2, 3), 10);
+    const y2 = parseInt(digits.slice(3, 7), 10);
+    if (d2 >= 1 && d2 <= 31 && m2 >= 1 && m2 <= 9 && y2 > 1000) {
+      return `${String(d2).padStart(2, '0')}/${String(m2).padStart(2, '0')}/${y2}`;
+    }
+  }
+
+  return val;
+};
+
 const getDaysInMonth = (year: number, month: number) => {
   const date = new Date(year, month, 1);
   const days = [];
@@ -189,11 +261,16 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
 
       const nextValues = { ...values };
       if (isDate) {
-        if (!nextValues[varName]?.trim()) {
+        const raw = nextValues[varName]?.trim() || '';
+        if (!raw) {
           const today = new Date();
           const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
           nextValues[varName] = dateStr;
           setValues(prev => ({ ...prev, [varName]: dateStr }));
+        } else {
+          const formatted = parseAndFormatDate(raw);
+          nextValues[varName] = formatted;
+          setValues(prev => ({ ...prev, [varName]: formatted }));
         }
       }
 
@@ -430,6 +507,14 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                                       handleDateInputChange(varName, e.target.value);
                                     } else {
                                       handleInputChange(varName, e.target.value);
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    if (isDate && e.target.value.trim()) {
+                                      const formatted = parseAndFormatDate(e.target.value);
+                                      if (formatted !== e.target.value) {
+                                        handleInputChange(varName, formatted);
+                                      }
                                     }
                                   }}
                                   onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}

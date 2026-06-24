@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Sliders, Info, Plus } from 'lucide-react';
+import { X, Save, Sliders, Info, Plus, Pencil, Check } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables } from '../utils/templateHelpers';
 
@@ -20,6 +20,8 @@ export default function TemplateForm({ categories, onSubmit, onCancel, initialDa
   const [variablePresets, setVariablePresets] = useState<Record<string, string[]>>({});
   const [selectedVarForPresets, setSelectedVarForPresets] = useState<string | null>(null);
   const [presetInputValue, setPresetInputValue] = useState('');
+  const [editingPresetIdx, setEditingPresetIdx] = useState<number | null>(null);
+  const [editingPresetValue, setEditingPresetValue] = useState('');
 
   // Initialize fields on editing load
   useEffect(() => {
@@ -54,6 +56,11 @@ export default function TemplateForm({ categories, onSubmit, onCancel, initialDa
     setDetectedVars(extractVariables(content));
   }, [content]);
 
+  useEffect(() => {
+    setEditingPresetIdx(null);
+    setEditingPresetValue('');
+  }, [selectedVarForPresets]);
+
   const handleAddPreset = () => {
     if (!selectedVarForPresets || !presetInputValue.trim()) return;
     const current = variablePresets[selectedVarForPresets] || [];
@@ -65,6 +72,18 @@ export default function TemplateForm({ categories, onSubmit, onCancel, initialDa
       });
     }
     setPresetInputValue('');
+  };
+
+  const handleSavePresetEdit = (idx: number) => {
+    if (!selectedVarForPresets || !editingPresetValue.trim()) return;
+    const current = variablePresets[selectedVarForPresets] || [];
+    const updated = [...current];
+    updated[idx] = editingPresetValue.trim();
+    setVariablePresets({
+      ...variablePresets,
+      [selectedVarForPresets]: updated
+    });
+    setEditingPresetIdx(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -259,26 +278,87 @@ export default function TemplateForm({ categories, onSubmit, onCancel, initialDa
                 {/* List of current presets */}
                 {(variablePresets[selectedVarForPresets] || []).length > 0 ? (
                   <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
-                    {(variablePresets[selectedVarForPresets] || []).map((preset, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2 px-2.5 bg-gray-50 rounded-md border border-gray-200 hover:border-gray-300 transition-colors">
-                        <span className="text-xs text-gray-700 font-sans truncate pr-2">{preset}</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const current = variablePresets[selectedVarForPresets] || [];
-                            const updated = current.filter((_, i) => i !== idx);
-                            setVariablePresets({
-                              ...variablePresets,
-                              [selectedVarForPresets]: updated
-                            });
-                          }}
-                          className="text-gray-400 hover:text-red-500 transition-colors shrink-0 p-0.5 rounded hover:bg-gray-100"
-                          title="Remover opção"
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
+                    {(variablePresets[selectedVarForPresets] || []).map((preset, idx) => {
+                      const isEditing = editingPresetIdx === idx;
+                      return (
+                        <div key={idx} className="flex items-center justify-between p-2 px-2.5 bg-gray-50 rounded-md border border-gray-200 hover:border-gray-300 transition-colors gap-2">
+                          {isEditing ? (
+                            <input
+                              type="text"
+                              value={editingPresetValue}
+                              onChange={(e) => setEditingPresetValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  handleSavePresetEdit(idx);
+                                } else if (e.key === 'Escape') {
+                                  setEditingPresetIdx(null);
+                                }
+                              }}
+                              className="flex-1 px-2 py-1 bg-white text-xs text-gray-900 border border-gray-300 rounded focus:border-black focus:outline-hidden font-sans"
+                              autoFocus
+                            />
+                          ) : (
+                            <span className="text-xs text-gray-700 font-sans truncate pr-2 flex-1">{preset}</span>
+                          )}
+                          
+                          <div className="flex items-center gap-1 shrink-0">
+                            {isEditing ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSavePresetEdit(idx)}
+                                  className="text-emerald-600 hover:text-emerald-700 p-1 rounded hover:bg-gray-150 transition-colors"
+                                  title="Salvar alteração"
+                                >
+                                  <Check size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingPresetIdx(null)}
+                                  className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-150 transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingPresetIdx(idx);
+                                    setEditingPresetValue(preset);
+                                  }}
+                                  className="text-gray-400 hover:text-blue-600 transition-colors p-1 rounded hover:bg-gray-150"
+                                  title="Editar opção"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const current = variablePresets[selectedVarForPresets] || [];
+                                    const updated = current.filter((_, i) => i !== idx);
+                                    setVariablePresets({
+                                      ...variablePresets,
+                                      [selectedVarForPresets]: updated
+                                    });
+                                    if (editingPresetIdx === idx) {
+                                      setEditingPresetIdx(null);
+                                    }
+                                  }}
+                                  className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-gray-150"
+                                  title="Remover opção"
+                                >
+                                  <X size={11} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-[11px] text-gray-400 italic font-sans py-1">
