@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables, replaceVariables, isMultilineVariable } from '../utils/templateHelpers';
@@ -115,6 +115,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
   const [activeCalendarVar, setActiveCalendarVar] = useState<string | null>(null);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
+  const lastEnterPressRef = useRef<{ time: number; varName: string | null }>({ time: 0, varName: null });
 
   useEffect(() => {
     if (template) {
@@ -143,20 +144,26 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
 
   const resolvedContent = replaceVariables(template.content, values);
 
-  const performCopy = (valsToCopy: Record<string, string>) => {
+  const performCopy = (valsToCopy: Record<string, string>, shouldClose: boolean = true) => {
     const textToCopy = replaceVariables(template.content, valsToCopy);
     navigator.clipboard.writeText(textToCopy).then(() => {
       setCopied(true);
       onCopy(template.id, textToCopy);
-      setTimeout(() => {
-        setCopied(false);
-        onClose(); // Auto-close to keep it rapid
-      }, 1500);
+      if (shouldClose) {
+        setTimeout(() => {
+          setCopied(false);
+          onClose(); // Auto-close to keep it rapid
+        }, 1500);
+      } else {
+        setTimeout(() => {
+          setCopied(false);
+        }, 1500);
+      }
     });
   };
 
   const handleCopy = () => {
-    performCopy(values);
+    performCopy(values, true);
   };
 
   const handleInputChange = (varName: string, val: string) => {
@@ -164,6 +171,51 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
       ...prev,
       [varName]: val
     }));
+  };
+
+  const handleFieldKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>, varName: string, isDate: boolean) => {
+    if (e.key === 'Enter') {
+      if (e.currentTarget.tagName === 'TEXTAREA' && e.shiftKey) {
+        return;
+      }
+      e.preventDefault();
+      
+      const now = Date.now();
+      const prevPress = lastEnterPressRef.current;
+      const isDoublePress = prevPress.varName === varName && (now - prevPress.time < 350);
+      
+      // Update ref
+      lastEnterPressRef.current = { time: now, varName };
+
+      const nextValues = { ...values };
+      if (isDate) {
+        if (!nextValues[varName]?.trim()) {
+          const today = new Date();
+          const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+          nextValues[varName] = dateStr;
+          setValues(prev => ({ ...prev, [varName]: dateStr }));
+        }
+      }
+
+      const idx = variables.indexOf(varName);
+      const isLastField = idx === variables.length - 1;
+
+      if (!isLastField) {
+        const nextVar = variables[idx + 1];
+        setTimeout(() => {
+          const nextElement = document.getElementById(`modal-input-${nextVar}`);
+          if (nextElement) {
+            nextElement.focus();
+          }
+        }, 50);
+      } else {
+        if (isDoublePress) {
+          performCopy(nextValues, true);
+        } else {
+          performCopy(nextValues, false);
+        }
+      }
+    }
   };
 
   const handlePresetSelect = (varName: string, presetVal: string) => {
@@ -362,6 +414,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                               value={values[varName] || ''}
                               rows={3}
                               onChange={(e) => handleInputChange(varName, e.target.value)}
+                              onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
                               className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs resize-y"
                             />
                           ) : (
@@ -379,23 +432,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                                       handleInputChange(varName, e.target.value);
                                     }
                                   }}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      const nextValues = { ...values };
-                                      if (isDate) {
-                                        if (!nextValues[varName]?.trim()) {
-                                          const today = new Date();
-                                          const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-                                          nextValues[varName] = dateStr;
-                                          setValues(nextValues);
-                                        }
-                                        // Do not copy or close for date fields, just populate if empty
-                                      } else {
-                                        performCopy(nextValues);
-                                      }
-                                    }
-                                  }}
+                                  onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
                                   className={`w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs ${
                                     isDate ? 'pr-10' : ''
                                   }`}
