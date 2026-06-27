@@ -371,6 +371,8 @@ export default function App() {
         template={activeQuickFill}
         onClose={() => setActiveQuickFill(null)}
         onCopy={handleCopy}
+        templates={templates}
+        onSelectTemplate={setActiveQuickFill}
       />
 
       {/* Custom Confirmation Modals */}

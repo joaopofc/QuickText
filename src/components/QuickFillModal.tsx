@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers, ExternalLink, ChevronDown } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables, replaceVariables, isMultilineVariable } from '../utils/templateHelpers';
 
@@ -179,9 +179,17 @@ interface QuickFillModalProps {
   template: Template | null;
   onClose: () => void;
   onCopy: (id: string, text: string) => void;
+  templates?: Template[];
+  onSelectTemplate?: (template: Template) => void;
 }
 
-export default function QuickFillModal({ template, onClose, onCopy }: QuickFillModalProps) {
+export default function QuickFillModal({ 
+  template, 
+  onClose, 
+  onCopy,
+  templates = [],
+  onSelectTemplate
+}: QuickFillModalProps) {
   const [copied, setCopied] = useState(false);
   const [variables, setVariables] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -433,8 +441,8 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
       if (shouldClose) {
         setTimeout(() => {
           setCopied(false);
-          handleClose(); // Auto-close to keep it rapid
-        }, 1500);
+          setIsMinimized(true); // Minimize to a floating button/pill instead of closing!
+        }, 1000);
       } else {
         setTimeout(() => {
           setCopied(false);
@@ -607,9 +615,33 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
             <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[8px] font-mono font-bold uppercase bg-gray-100 text-gray-600 border border-gray-200 mr-1.5">
               {template.category}
             </span>
-            <span className="font-bold text-gray-900 text-xs truncate max-w-[220px] inline-block align-middle" title={template.title}>
-              {template.title}
-            </span>
+            {templates && templates.length > 0 && onSelectTemplate ? (
+              <div className="relative inline-block max-w-[220px] align-middle">
+                <select
+                  value={template.id}
+                  onChange={(e) => {
+                    const selected = templates.find(t => t.id === e.target.value);
+                    if (selected) {
+                      onSelectTemplate(selected);
+                    }
+                  }}
+                  className="bg-transparent font-sans font-bold text-gray-900 text-xs tracking-tight focus:outline-hidden cursor-pointer appearance-none pr-4 truncate border-none p-0 focus:ring-0"
+                >
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id} className="text-gray-900 bg-white py-1">
+                      [{t.category}] {t.title}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-gray-500">
+                  <ChevronDown size={11} />
+                </div>
+              </div>
+            ) : (
+              <span className="font-bold text-gray-900 text-xs truncate max-w-[220px] inline-block align-middle" title={template.title}>
+                {template.title}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <button
@@ -781,6 +813,45 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
     );
   };
 
+  if (isPipMode && isMinimized) {
+    return (
+      <div
+        id="quick-fill-minimized-pill"
+        onMouseDown={handleMouseDown}
+        onTouchStart={handleTouchStart}
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          zIndex: 100,
+        }}
+        className="bg-black text-white hover:bg-neutral-900 border border-neutral-800 shadow-xl flex items-center gap-2 px-3.5 py-2 rounded-full cursor-grab active:cursor-grabbing pointer-events-auto select-none transition-all hover:scale-105"
+        title="Arraste para mover. Clique para abrir."
+      >
+        <button
+          type="button"
+          onClick={() => setIsMinimized(false)}
+          className="flex items-center gap-1.5 text-xs font-bold font-sans cursor-pointer focus:outline-hidden"
+        >
+          <Layers size={13} className="text-gray-300 animate-pulse" />
+          <span className="truncate max-w-[120px] text-[11px] font-sans text-white">{template?.title || "Assistente"}</span>
+        </button>
+        
+        <div className="h-3 w-[1px] bg-neutral-700"></div>
+        
+        <button
+          type="button"
+          onClick={handleClose}
+          className="text-gray-400 hover:text-white rounded-full transition-colors cursor-pointer focus:outline-hidden"
+          title="Fechar"
+        >
+          <X size={12} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       id="quick-fill-modal-backdrop"
@@ -833,9 +904,33 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                 </span>
               )}
             </div>
-            <h3 className="font-sans font-bold text-gray-900 tracking-tight text-sm truncate" title={template.title}>
-              {template.title}
-            </h3>
+            {templates && templates.length > 0 && onSelectTemplate ? (
+              <div className="relative inline-block w-full">
+                <select
+                  value={template.id}
+                  onChange={(e) => {
+                    const selected = templates.find(t => t.id === e.target.value);
+                    if (selected) {
+                      onSelectTemplate(selected);
+                    }
+                  }}
+                  className="w-full bg-transparent font-sans font-bold text-gray-950 text-sm tracking-tight focus:outline-hidden cursor-pointer appearance-none pr-6 truncate border-none p-0 focus:ring-0"
+                >
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id} className="text-gray-900 bg-white py-1 font-sans">
+                      [{t.category}] {t.title}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center text-gray-500">
+                  <ChevronDown size={14} />
+                </div>
+              </div>
+            ) : (
+              <h3 className="font-sans font-bold text-gray-900 tracking-tight text-sm truncate" title={template.title}>
+                {template.title}
+              </h3>
+            )}
           </div>
           
           {/* Header Actions */}

@@ -243,7 +243,7 @@ export default function SettingsModal({
               <div className="space-y-3.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
-                    📌 Assistente Flutuante (Fixar)
+                    Assistente Flutuante (Fixar)
                   </span>
                 </div>
 
@@ -344,7 +344,7 @@ export default function SettingsModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
-                    🎨 Modelos de Amostra
+                    Modelos de Amostra
                   </span>
                   <HelpButton id="samples" />
                 </div>
@@ -398,7 +398,7 @@ export default function SettingsModal({
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
-                    📥 Exportar Backup
+                    Exportar Backup
                   </span>
                   <HelpButton id="export" />
                 </div>
@@ -428,7 +428,7 @@ export default function SettingsModal({
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
-                    📤 Importar Backup
+                    Importar Backup
                   </span>
                   <HelpButton id="import" />
                 </div>
