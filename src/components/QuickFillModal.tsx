@@ -225,9 +225,14 @@ export default function QuickFillModal({
   useEffect(() => {
     if (externalPipWindow) {
       try {
+        const body = externalPipWindow.document.body;
         if (isMinimized) {
-          externalPipWindow.resizeTo(280, 54);
+          body.style.backgroundColor = '#000000';
+          body.style.color = '#ffffff';
+          externalPipWindow.resizeTo(320, 100);
         } else {
+          body.style.backgroundColor = '#ffffff';
+          body.style.color = '#0b0f19';
           externalPipWindow.resizeTo(480, 620);
         }
       } catch (e) {
@@ -861,7 +866,7 @@ export default function QuickFillModal({
     );
   };
 
-  if (isPipMode && isMinimized) {
+  if (isPipMode && isMinimized && !externalPipWindow) {
     return (
       <div
         id="quick-fill-minimized-pill"
