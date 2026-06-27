@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables, replaceVariables, isMultilineVariable } from '../utils/templateHelpers';
 
@@ -189,6 +189,82 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
   const lastEnterPressRef = useRef<{ time: number; varName: string | null }>({ time: 0, varName: null });
 
+  // Picture-in-Picture (PiP) and floating states
+  const [isPipMode, setIsPipMode] = useState(true);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [pipTab, setPipTab] = useState<'fill' | 'preview'>('fill');
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({ startX: 0, startY: 0, posX: 0, posY: 0 });
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('textarea')) {
+      return;
+    }
+    
+    setIsDragging(true);
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      posX: position.x,
+      posY: position.y
+    };
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaX = moveEvent.clientX - dragRef.current.startX;
+      const deltaY = moveEvent.clientY - dragRef.current.startY;
+      setPosition({
+        x: dragRef.current.posX + deltaX,
+        y: dragRef.current.posY + deltaY
+      });
+    };
+    
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('textarea')) {
+      return;
+    }
+    
+    const touch = e.touches[0];
+    setIsDragging(true);
+    dragRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      posX: position.x,
+      posY: position.y
+    };
+    
+    const handleTouchMove = (moveEvent: TouchEvent) => {
+      const touchItem = moveEvent.touches[0];
+      const deltaX = touchItem.clientX - dragRef.current.startX;
+      const deltaY = touchItem.clientY - dragRef.current.startY;
+      setPosition({
+        x: dragRef.current.posX + deltaX,
+        y: dragRef.current.posY + deltaY
+      });
+    };
+    
+    const handleTouchEnd = () => {
+      setIsDragging(false);
+      document.removeEventListener('touchmove', handleTouchMove);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+    
+    document.addEventListener('touchmove', handleTouchMove, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd);
+  };
+
   useEffect(() => {
     if (template) {
       const extracted = extractVariables(template.content);
@@ -363,372 +439,729 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
   return (
     <div
       id="quick-fill-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
+        isPipMode 
+          ? 'pointer-events-none bg-transparent' 
+          : 'pointer-events-auto bg-black/45 backdrop-blur-xs'
+      }`}
     >
       <div
         id="quick-fill-modal-content"
-        className="bg-white border border-gray-200 rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]"
+        onMouseDown={isPipMode ? handleMouseDown : undefined}
+        onTouchStart={isPipMode ? handleTouchStart : undefined}
+        style={
+          isPipMode
+            ? {
+                transform: `translate(${position.x}px, ${position.y}px)`,
+                position: 'fixed',
+                bottom: '24px',
+                right: '24px',
+                width: 'min(calc(100vw - 32px), 520px)',
+                height: isMinimized ? 'auto' : '620px',
+                maxHeight: 'calc(100vh - 48px)',
+                zIndex: 100,
+              }
+            : {}
+        }
+        className={`bg-white border border-gray-200 shadow-2xl flex flex-col pointer-events-auto transition-all ${
+          isPipMode 
+            ? 'rounded-2xl border-gray-300/90' 
+            : 'max-w-4xl w-full rounded-xl overflow-hidden max-h-[85vh]'
+        } ${isDragging ? 'select-none ring-1 ring-black/10' : ''}`}
       >
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#fafafa]">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase bg-gray-100 text-gray-700 border border-gray-200">
+        {/* Modal Header / PIP Drag handle */}
+        <div 
+          className={`px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 bg-[#fafafa] select-none ${
+            isPipMode ? 'cursor-grab active:cursor-grabbing rounded-t-2xl' : ''
+          }`}
+          title={isPipMode ? 'Arraste para mover o painel flutuante' : ''}
+        >
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase bg-gray-100 text-gray-600 border border-gray-200">
                 {template.category}
               </span>
-              <span className="text-[10px] font-mono text-gray-400 font-medium">MODO PREENCHIMENTO RÁPIDO</span>
+              {isPipMode && (
+                <span className="flex items-center gap-1 text-[9px] font-bold text-amber-600 uppercase tracking-wider font-mono">
+                  <Move size={10} />
+                  Flutuante (PiP)
+                </span>
+              )}
             </div>
-            <h3 className="font-sans font-bold text-gray-900 tracking-tight text-base">
+            <h3 className="font-sans font-bold text-gray-900 tracking-tight text-sm truncate" title={template.title}>
               {template.title}
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Insira as informações abaixo para gerar a resposta instantaneamente.
-            </p>
           </div>
           
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Header Actions */}
+          <div className="flex items-center gap-1.5 shrink-0 pointer-events-auto">
+            {/* Toggle PiP Mode */}
             <button
-              id="modal-cancel-btn-top"
-              onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-black bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-all duration-150 cursor-pointer"
-            >
-              Cancelar
-            </button>
-            
-            <button
-              id="modal-copy-btn-top"
-              onClick={handleCopy}
-              className={`px-5 py-2 rounded-lg font-sans text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
-                copied
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-xs'
-                  : 'bg-black hover:bg-neutral-800 text-white border-black shadow-xs'
+              type="button"
+              onClick={() => {
+                setIsPipMode(!isPipMode);
+                setIsMinimized(false);
+                setPosition({ x: 0, y: 0 }); // Reset position when toggling
+              }}
+              className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                isPipMode 
+                  ? 'bg-black text-white hover:bg-neutral-800' 
+                  : 'text-gray-400 hover:text-black hover:bg-gray-100'
               }`}
+              title={isPipMode ? "Voltar para o modo tela cheia" : "Entrar no modo flutuante (PiP)"}
             >
-              {copied ? (
-                <>
-                  <Check size={14} className="animate-bounce text-emerald-600" />
-                  <span>Copiado!</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={13} />
-                  <span>Copiar e Fechar</span>
-                </>
-              )}
+              <Layers size={13} />
             </button>
 
-            <div className="h-4 w-[1px] bg-gray-200 mx-1 hidden md:block"></div>
+            {/* Minimize / Expand (Only in PiP mode) */}
+            {isPipMode && (
+              <button
+                type="button"
+                onClick={() => setIsMinimized(!isMinimized)}
+                className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all cursor-pointer"
+                title={isMinimized ? "Expandir painel" : "Minimizar painel"}
+              >
+                {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
+              </button>
+            )}
 
+            <div className="h-4 w-[1px] bg-gray-200 mx-0.5"></div>
+
+            {/* Close */}
             <button
-              id="close-modal-btn"
+              type="button"
               onClick={onClose}
-              className="text-gray-400 hover:text-black p-1.5 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
-              title="Fechar modal"
+              className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+              title="Fechar painel"
             >
-              <X size={16} />
+              <X size={15} />
             </button>
           </div>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6 overflow-y-auto flex-1 bg-white">
-          {variables.length > 0 ? (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
+        {/* Tab Selection (Only in PiP mode when not minimized) */}
+        {isPipMode && !isMinimized && variables.length > 0 && (
+          <div className="px-4 py-1.5 border-b border-gray-100 bg-neutral-50 flex items-center justify-between gap-4">
+            <div className="flex gap-1 bg-gray-200/60 p-0.5 rounded-lg text-xs font-medium">
+              <button
+                type="button"
+                onClick={() => setPipTab('fill')}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  pipTab === 'fill' 
+                    ? 'bg-white text-black font-semibold shadow-3xs' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                Preencher
+              </button>
+              <button
+                type="button"
+                onClick={() => setPipTab('preview')}
+                className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                  pipTab === 'preview' 
+                    ? 'bg-white text-black font-semibold shadow-3xs' 
+                    : 'text-gray-500 hover:text-black'
+                }`}
+              >
+                Visualizar
+              </button>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleClear}
+                className="text-gray-400 hover:text-black flex items-center gap-1 text-[10px] font-mono transition-colors"
+                title="Limpar todos os campos"
+              >
+                <RefreshCw size={10} />
+                Limpar
+              </button>
               
-              {/* Left Column: Form inputs */}
-              <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center pb-2 border-b border-gray-100">
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wider font-mono">
-                      <Sliders size={13} className="text-gray-500" />
-                      Variáveis de Entrada
-                    </span>
-                    <button
-                      id="modal-clear-vars"
-                      onClick={handleClear}
-                      className="text-gray-400 hover:text-black flex items-center gap-1 text-[10px] font-mono transition-colors"
-                    >
-                      <RefreshCw size={11} />
-                      Limpar tudo
-                    </button>
-                  </div>
+              <button
+                onClick={handleCopy}
+                className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 transition-all border cursor-pointer ${
+                  copied
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-3xs'
+                    : 'bg-black hover:bg-neutral-800 text-white border-black shadow-3xs'
+                }`}
+              >
+                {copied ? (
+                  <>
+                    <Check size={11} className="text-emerald-600 animate-pulse" />
+                    <span>Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={10} />
+                    <span>Copiar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
-                  <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2">
-                    {variables.map(varName => {
-                      const isFilled = !!values[varName];
-                      const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
-                      const presets = template?.variablePresets?.[varName] || [];
-                      const isDate = isDateVariable(varName);
+        {/* Modal/PiP Body */}
+        {!isMinimized && (
+          <div className="p-5 overflow-y-auto flex-1 bg-white flex flex-col min-h-0">
+            {isPipMode ? (
+              /* --- PIP MODE ACTIVE CONTENT --- */
+              <div className="flex-1 flex flex-col min-h-0">
+                {pipTab === 'fill' ? (
+                  /* Form Fields Tab */
+                  <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+                    {variables.length > 0 ? (
+                      variables.map(varName => {
+                        const isFilled = !!values[varName];
+                        const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
+                        const presets = template?.variablePresets?.[varName] || [];
+                        const isDate = isDateVariable(varName);
 
-                      const handleDateInputChange = (valName: string, rawVal: string) => {
-                        const hasLetters = /[a-zA-Z]/.test(rawVal);
-                        if (hasLetters) {
-                          handleInputChange(valName, rawVal);
-                        } else {
-                          const formatted = formatAsDateMask(rawVal);
-                          handleInputChange(valName, formatted);
-                        }
-                      };
+                        const handleDateInputChange = (valName: string, rawVal: string) => {
+                          const hasLetters = /[a-zA-Z]/.test(rawVal);
+                          if (hasLetters) {
+                            handleInputChange(valName, rawVal);
+                          } else {
+                            const formatted = formatAsDateMask(rawVal);
+                            handleInputChange(valName, formatted);
+                          }
+                        };
 
-                      return (
-                        <div key={varName} className="space-y-1.5 group">
-                          <div className="flex justify-between items-center">
-                            <label
-                              htmlFor={`modal-input-${varName}`}
-                              className="block text-xs font-semibold text-gray-700 font-mono"
-                            >
-                              {varName} {isMultiline && <span className="text-[10px] text-indigo-500 font-normal font-sans">(Grande)</span>}
-                            </label>
-                            <span className={`text-[10px] font-mono ${isFilled ? 'text-emerald-600' : 'text-amber-500'}`}>
-                              {isFilled ? 'Preenchido' : 'Pendente'}
-                            </span>
-                          </div>
-                          
-                          {isMultiline ? (
-                            <textarea
-                              id={`modal-input-${varName}`}
-                              placeholder={`Inserir valor para ${varName}...`}
-                              value={values[varName] || ''}
-                              rows={3}
-                              onChange={(e) => handleInputChange(varName, e.target.value)}
-                              onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
-                              className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs resize-y"
-                            />
-                          ) : (
-                            <div className="space-y-2">
-                              <div className="relative flex items-center">
-                                <input
-                                  id={`modal-input-${varName}`}
-                                  type="text"
-                                  placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
-                                  value={values[varName] || ''}
-                                  onChange={(e) => {
-                                    if (isDate) {
-                                      handleDateInputChange(varName, e.target.value);
-                                    } else {
-                                      handleInputChange(varName, e.target.value);
-                                    }
-                                  }}
-                                  onBlur={(e) => {
-                                    if (isDate && e.target.value.trim()) {
-                                      const formatted = parseAndFormatDate(e.target.value);
-                                      if (formatted !== e.target.value) {
-                                        handleInputChange(varName, formatted);
+                        return (
+                          <div key={varName} className="space-y-1.5">
+                            <div className="flex justify-between items-center">
+                              <label
+                                htmlFor={`modal-input-${varName}`}
+                                className="block text-[11px] font-bold text-gray-700 font-mono"
+                              >
+                                {varName} {isMultiline && <span className="text-[10px] text-indigo-500 font-normal font-sans">(Grande)</span>}
+                              </label>
+                              <span className={`text-[9px] font-mono font-bold ${isFilled ? 'text-emerald-600' : 'text-amber-500'}`}>
+                                {isFilled ? 'Preenchido' : 'Pendente'}
+                              </span>
+                            </div>
+                            
+                            {isMultiline ? (
+                              <textarea
+                                id={`modal-input-${varName}`}
+                                placeholder={`Inserir valor para ${varName}...`}
+                                value={values[varName] || ''}
+                                rows={2}
+                                onChange={(e) => handleInputChange(varName, e.target.value)}
+                                onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
+                                className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs resize-y"
+                              />
+                            ) : (
+                              <div className="space-y-2">
+                                <div className="relative flex items-center">
+                                  <input
+                                    id={`modal-input-${varName}`}
+                                    type="text"
+                                    placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                                    value={values[varName] || ''}
+                                    onChange={(e) => {
+                                      if (isDate) {
+                                        handleDateInputChange(varName, e.target.value);
+                                      } else {
+                                        handleInputChange(varName, e.target.value);
                                       }
-                                    }
-                                  }}
-                                  onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
-                                  className={`w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs ${
-                                    isDate ? 'pr-10' : ''
-                                  }`}
-                                />
-                                {isDate && (
-                                  <div className="absolute right-2 flex items-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => handleToggleCalendar(varName)}
-                                      className={`p-1.5 rounded transition-colors cursor-pointer flex items-center justify-center ${
-                                        activeCalendarVar === varName 
-                                          ? 'bg-black text-white' 
-                                          : 'hover:bg-gray-100 text-gray-400 hover:text-black'
-                                      }`}
-                                      title="Escolher data no calendário"
-                                    >
-                                      <Calendar size={15} />
-                                    </button>
+                                    }}
+                                    onBlur={(e) => {
+                                      if (isDate && e.target.value.trim()) {
+                                        const formatted = parseAndFormatDate(e.target.value);
+                                        if (formatted !== e.target.value) {
+                                          handleInputChange(varName, formatted);
+                                        }
+                                      }
+                                    }}
+                                    onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
+                                    className={`w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs ${
+                                      isDate ? 'pr-9' : ''
+                                    }`}
+                                  />
+                                  {isDate && (
+                                    <div className="absolute right-1.5 flex items-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleCalendar(varName)}
+                                        className={`p-1 rounded transition-colors cursor-pointer flex items-center justify-center ${
+                                          activeCalendarVar === varName 
+                                            ? 'bg-black text-white' 
+                                            : 'hover:bg-gray-100 text-gray-400 hover:text-black'
+                                        }`}
+                                        title="Escolher data no calendário"
+                                      >
+                                        <Calendar size={13} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {isDate && activeCalendarVar === varName && (
+                                  <div className="bg-neutral-50 border border-gray-200 rounded-lg p-2.5 space-y-2.5 animate-in slide-in-from-top-1 fade-in duration-200 shadow-3xs">
+                                    {/* Month/Year selector header */}
+                                    <div className="flex items-center justify-between">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (calendarMonth === 0) {
+                                            setCalendarMonth(11);
+                                            setCalendarYear(prev => prev - 1);
+                                          } else {
+                                            setCalendarMonth(prev => prev - 1);
+                                          }
+                                        }}
+                                        className="p-0.5 hover:bg-white border border-gray-100 rounded text-gray-500 hover:text-black cursor-pointer"
+                                      >
+                                        <ChevronLeft size={12} />
+                                      </button>
+                                      
+                                      <div className="flex items-center gap-1 bg-white border border-gray-200 px-1 py-0.5 rounded text-[10px]">
+                                        <select
+                                          value={calendarMonth}
+                                          onChange={(e) => setCalendarMonth(parseInt(e.target.value, 10))}
+                                          className="bg-transparent font-bold text-gray-800 border-none focus:ring-0 focus:outline-hidden p-0 cursor-pointer"
+                                        >
+                                          {MONTHS_PT.map((m, mIdx) => (
+                                            <option key={mIdx} value={mIdx}>
+                                              {m.substring(0, 3)}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <span className="text-gray-300">|</span>
+                                        <select
+                                          value={calendarYear}
+                                          onChange={(e) => setCalendarYear(parseInt(e.target.value, 10))}
+                                          className="bg-transparent font-bold text-gray-800 border-none focus:ring-0 focus:outline-hidden p-0 cursor-pointer"
+                                        >
+                                          {getYearOptions(calendarYear).map(year => (
+                                            <option key={year} value={year}>
+                                              {year}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          if (calendarMonth === 11) {
+                                            setCalendarMonth(0);
+                                            setCalendarYear(prev => prev + 1);
+                                          } else {
+                                            setCalendarMonth(prev => prev + 1);
+                                          }
+                                        }}
+                                        className="p-0.5 hover:bg-white border border-gray-100 rounded text-gray-500 hover:text-black cursor-pointer"
+                                      >
+                                        <ChevronRight size={12} />
+                                      </button>
+                                    </div>
+
+                                    {/* Weekdays */}
+                                    <div className="grid grid-cols-7 gap-0.5 text-center">
+                                      {WEEKDAYS_PT.map(day => (
+                                        <span key={day} className="text-[8px] font-bold text-gray-400 uppercase font-mono">
+                                          {day.substring(0, 1)}
+                                        </span>
+                                      ))}
+                                    </div>
+
+                                    {/* Days Grid */}
+                                    <div className="grid grid-cols-7 gap-0.5">
+                                      {getDaysInMonth(calendarYear, calendarMonth).map((item, idx) => {
+                                        const dateStr = `${String(item.day).padStart(2, '0')}/${String(item.month + 1).padStart(2, '0')}/${item.year}`;
+                                        const isSel = values[varName] === dateStr;
+                                        const isCurrentToday = isToday(item.day, item.month, item.year);
+                                        
+                                        return (
+                                          <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => {
+                                              handleInputChange(varName, dateStr);
+                                              setActiveCalendarVar(null);
+                                            }}
+                                            className={`h-5 text-[10px] font-sans font-medium rounded flex items-center justify-center transition-all cursor-pointer ${
+                                              item.isCurrentMonth 
+                                                ? isSel
+                                                  ? 'bg-black text-white font-semibold'
+                                                  : isCurrentToday
+                                                    ? 'bg-neutral-200 text-black border border-gray-300 font-semibold'
+                                                    : 'bg-white hover:bg-gray-100 text-gray-800'
+                                                : 'text-gray-300 pointer-events-none'
+                                            }`}
+                                          >
+                                            {item.day}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
                                 )}
                               </div>
+                            )}
 
-                              {isDate && activeCalendarVar === varName && (
-                                <div className="bg-neutral-50 border border-gray-200/80 rounded-xl p-3.5 space-y-3 animate-in slide-in-from-top-1 fade-in duration-200 shadow-xs">
-                                  {/* Month/Year selector header */}
-                                  <div className="flex items-center justify-between">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (calendarMonth === 0) {
-                                          setCalendarMonth(11);
-                                          setCalendarYear(prev => prev - 1);
-                                        } else {
-                                          setCalendarMonth(prev => prev - 1);
-                                        }
-                                      }}
-                                      className="p-1 hover:bg-white border border-gray-100 rounded-md text-gray-500 hover:text-black transition-colors cursor-pointer"
-                                    >
-                                      <ChevronLeft size={14} />
-                                    </button>
-                                    
-                                    <div className="flex items-center gap-1 bg-white border border-gray-200/60 px-1.5 py-0.5 rounded-md shadow-3xs">
-                                      {/* Month Dropdown */}
-                                      <select
-                                        value={calendarMonth}
-                                        onChange={(e) => setCalendarMonth(parseInt(e.target.value, 10))}
-                                        className="bg-transparent text-xs font-bold text-gray-800 font-sans border-none focus:ring-0 focus:outline-hidden p-0.5 cursor-pointer rounded"
-                                      >
-                                        {MONTHS_PT.map((m, mIdx) => (
-                                          <option key={mIdx} value={mIdx}>
-                                            {m}
-                                          </option>
-                                        ))}
-                                      </select>
-                                      
-                                      <span className="text-gray-300 text-xs font-semibold">|</span>
-
-                                      {/* Year Dropdown */}
-                                      <select
-                                        value={calendarYear}
-                                        onChange={(e) => setCalendarYear(parseInt(e.target.value, 10))}
-                                        className="bg-transparent text-xs font-bold text-gray-800 font-sans border-none focus:ring-0 focus:outline-hidden p-0.5 cursor-pointer rounded"
-                                      >
-                                        {getYearOptions(calendarYear).map(year => (
-                                          <option key={year} value={year}>
-                                            {year}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </div>
-                                    
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        if (calendarMonth === 11) {
-                                          setCalendarMonth(0);
-                                          setCalendarYear(prev => prev + 1);
-                                        } else {
-                                          setCalendarMonth(prev => prev + 1);
-                                        }
-                                      }}
-                                      className="p-1 hover:bg-white border border-gray-100 rounded-md text-gray-500 hover:text-black transition-colors cursor-pointer"
-                                    >
-                                      <ChevronRight size={14} />
-                                    </button>
-                                  </div>
-
-                                  {/* Weekdays */}
-                                  <div className="grid grid-cols-7 gap-1 text-center">
-                                    {WEEKDAYS_PT.map(day => (
-                                      <span key={day} className="text-[9px] font-bold text-gray-400 uppercase font-mono">
-                                        {day}
-                                      </span>
-                                    ))}
-                                  </div>
-
-                                  {/* Days Grid */}
-                                  <div className="grid grid-cols-7 gap-1">
-                                    {getDaysInMonth(calendarYear, calendarMonth).map((item, idx) => {
-                                      const dateStr = `${String(item.day).padStart(2, '0')}/${String(item.month + 1).padStart(2, '0')}/${item.year}`;
-                                      const isSel = values[varName] === dateStr;
-                                      const isCurrentToday = isToday(item.day, item.month, item.year);
-                                      
-                                      return (
-                                        <button
-                                          key={idx}
-                                          type="button"
-                                          onClick={() => {
-                                            handleInputChange(varName, dateStr);
-                                            setActiveCalendarVar(null); // auto-close on selection
-                                          }}
-                                          className={`h-7 text-xs font-sans font-medium rounded-md flex items-center justify-center transition-all cursor-pointer ${
-                                            item.isCurrentMonth 
-                                              ? isSel
-                                                ? 'bg-black text-white font-semibold'
-                                                : isCurrentToday
-                                                  ? 'bg-neutral-200 text-black border border-gray-300 font-semibold'
-                                                  : 'bg-white hover:bg-gray-150 text-gray-800 border border-gray-100'
-                                              : 'text-gray-300 pointer-events-none'
-                                          }`}
-                                        >
-                                          {item.day}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-
-                                  {/* Quick helper buttons */}
-                                  <div className="flex items-center justify-between pt-1 text-[10px] border-t border-gray-100 font-sans">
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const today = new Date();
-                                        const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
-                                        handleInputChange(varName, dateStr);
-                                        setActiveCalendarVar(null);
-                                      }}
-                                      className="text-black font-bold hover:underline cursor-pointer"
-                                    >
-                                      Hoje
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => setActiveCalendarVar(null)}
-                                      className="text-gray-400 hover:text-black font-medium cursor-pointer"
-                                    >
-                                      Fechar
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Quick selection presets list if available */}
-                          {presets.length > 0 && (
-                            <div className="space-y-1">
-                              <span className="block text-[10px] text-gray-400 font-mono">Sugestões rápidas:</span>
-                              <div className="flex flex-wrap gap-1">
+                            {/* Suggestions */}
+                            {presets.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1">
                                 {presets.map((preset, pIdx) => (
                                   <button
                                     key={pIdx}
                                     type="button"
                                     onClick={() => handlePresetSelect(varName, preset)}
-                                    className="px-2 py-0.5 text-[10px] text-gray-600 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 rounded transition-all duration-150 text-left font-sans truncate max-w-full cursor-pointer"
+                                    className="px-1.5 py-0.5 text-[9px] text-gray-500 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 rounded transition-all max-w-full truncate cursor-pointer font-sans"
                                     title={preset}
                                   >
                                     {preset}
                                   </button>
                                 ))}
                               </div>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <p className="text-xs text-gray-500 italic py-4">Sem variáveis neste template.</p>
+                    )}
+                  </div>
+                ) : (
+                  /* Live Preview Tab */
+                  <div className="flex-1 flex flex-col min-h-0">
+                    <div className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-4 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto shadow-inner relative select-text">
+                      {renderLivePreview()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* --- STANDARD OVERLAY FULL MODAL CONTENT --- */
+              variables.length > 0 ? (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch w-full flex-1 min-h-0">
+                  
+                  {/* Left Column: Form inputs */}
+                  <div className="lg:col-span-5 flex flex-col justify-between space-y-4">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center pb-2 border-b border-gray-100">
+                        <span className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wider font-mono">
+                          <Sliders size={13} className="text-gray-500" />
+                          Variáveis de Entrada
+                        </span>
+                        <button
+                          id="modal-clear-vars"
+                          onClick={handleClear}
+                          className="text-gray-400 hover:text-black flex items-center gap-1 text-[10px] font-mono transition-colors cursor-pointer"
+                        >
+                          <RefreshCw size={11} />
+                          Limpar tudo
+                        </button>
+                      </div>
+
+                      <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2">
+                        {variables.map(varName => {
+                          const isFilled = !!values[varName];
+                          const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
+                          const presets = template?.variablePresets?.[varName] || [];
+                          const isDate = isDateVariable(varName);
+
+                          const handleDateInputChange = (valName: string, rawVal: string) => {
+                            const hasLetters = /[a-zA-Z]/.test(rawVal);
+                            if (hasLetters) {
+                              handleInputChange(valName, rawVal);
+                            } else {
+                              const formatted = formatAsDateMask(rawVal);
+                              handleInputChange(valName, formatted);
+                            }
+                          };
+
+                          return (
+                            <div key={varName} className="space-y-1.5 group">
+                              <div className="flex justify-between items-center">
+                                <label
+                                  htmlFor={`modal-input-${varName}`}
+                                  className="block text-xs font-semibold text-gray-700 font-mono"
+                                >
+                                  {varName} {isMultiline && <span className="text-[10px] text-indigo-500 font-normal font-sans">(Grande)</span>}
+                                </label>
+                                <span className={`text-[10px] font-mono ${isFilled ? 'text-emerald-600' : 'text-amber-500'}`}>
+                                  {isFilled ? 'Preenchido' : 'Pendente'}
+                                </span>
+                              </div>
+                              
+                              {isMultiline ? (
+                                <textarea
+                                  id={`modal-input-${varName}`}
+                                  placeholder={`Inserir valor para ${varName}...`}
+                                  value={values[varName] || ''}
+                                  rows={3}
+                                  onChange={(e) => handleInputChange(varName, e.target.value)}
+                                  onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
+                                  className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs resize-y"
+                                />
+                              ) : (
+                                <div className="space-y-2">
+                                  <div className="relative flex items-center">
+                                    <input
+                                      id={`modal-input-${varName}`}
+                                      type="text"
+                                      placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                                      value={values[varName] || ''}
+                                      onChange={(e) => {
+                                        if (isDate) {
+                                          handleDateInputChange(varName, e.target.value);
+                                        } else {
+                                          handleInputChange(varName, e.target.value);
+                                        }
+                                      }}
+                                      onBlur={(e) => {
+                                        if (isDate && e.target.value.trim()) {
+                                          const formatted = parseAndFormatDate(e.target.value);
+                                          if (formatted !== e.target.value) {
+                                            handleInputChange(varName, formatted);
+                                          }
+                                        }
+                                      }}
+                                      onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
+                                      className={`w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs ${
+                                        isDate ? 'pr-10' : ''
+                                      }`}
+                                    />
+                                    {isDate && (
+                                      <div className="absolute right-2 flex items-center">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleToggleCalendar(varName)}
+                                          className={`p-1.5 rounded transition-colors cursor-pointer flex items-center justify-center ${
+                                            activeCalendarVar === varName 
+                                              ? 'bg-black text-white' 
+                                              : 'hover:bg-gray-100 text-gray-400 hover:text-black'
+                                          }`}
+                                          title="Escolher data no calendário"
+                                        >
+                                          <Calendar size={15} />
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {isDate && activeCalendarVar === varName && (
+                                    <div className="bg-neutral-50 border border-gray-200/80 rounded-xl p-3.5 space-y-3 animate-in slide-in-from-top-1 fade-in duration-200 shadow-xs">
+                                      {/* Month/Year selector header */}
+                                      <div className="flex items-center justify-between">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (calendarMonth === 0) {
+                                              setCalendarMonth(11);
+                                              setCalendarYear(prev => prev - 1);
+                                            } else {
+                                              setCalendarMonth(prev => prev - 1);
+                                            }
+                                          }}
+                                          className="p-1 hover:bg-white border border-gray-100 rounded-md text-gray-500 hover:text-black transition-colors cursor-pointer"
+                                        >
+                                          <ChevronLeft size={14} />
+                                        </button>
+                                        
+                                        <div className="flex items-center gap-1 bg-white border border-gray-200/60 px-1.5 py-0.5 rounded-md shadow-3xs">
+                                          <select
+                                            value={calendarMonth}
+                                            onChange={(e) => setCalendarMonth(parseInt(e.target.value, 10))}
+                                            className="bg-transparent text-xs font-bold text-gray-800 font-sans border-none focus:ring-0 focus:outline-hidden p-0.5 cursor-pointer rounded"
+                                          >
+                                            {MONTHS_PT.map((m, mIdx) => (
+                                              <option key={mIdx} value={mIdx}>
+                                                {m}
+                                              </option>
+                                            ))}
+                                          </select>
+                                          <span className="text-gray-300 text-xs font-semibold">|</span>
+                                          <select
+                                            value={calendarYear}
+                                            onChange={(e) => setCalendarYear(parseInt(e.target.value, 10))}
+                                            className="bg-transparent text-xs font-bold text-gray-800 font-sans border-none focus:ring-0 focus:outline-hidden p-0.5 cursor-pointer rounded"
+                                          >
+                                            {getYearOptions(calendarYear).map(year => (
+                                              <option key={year} value={year}>
+                                                {year}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                        
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            if (calendarMonth === 11) {
+                                              setCalendarMonth(0);
+                                              setCalendarYear(prev => prev + 1);
+                                            } else {
+                                              setCalendarMonth(prev => prev + 1);
+                                            }
+                                          }}
+                                          className="p-1 hover:bg-white border border-gray-100 rounded-md text-gray-500 hover:text-black transition-colors cursor-pointer"
+                                        >
+                                          <ChevronRight size={14} />
+                                        </button>
+                                      </div>
+
+                                      {/* Weekdays */}
+                                      <div className="grid grid-cols-7 gap-1 text-center">
+                                        {WEEKDAYS_PT.map(day => (
+                                          <span key={day} className="text-[9px] font-bold text-gray-400 uppercase font-mono">
+                                            {day}
+                                          </span>
+                                        ))}
+                                      </div>
+
+                                      {/* Days Grid */}
+                                      <div className="grid grid-cols-7 gap-1">
+                                        {getDaysInMonth(calendarYear, calendarMonth).map((item, idx) => {
+                                          const dateStr = `${String(item.day).padStart(2, '0')}/${String(item.month + 1).padStart(2, '0')}/${item.year}`;
+                                          const isSel = values[varName] === dateStr;
+                                          const isCurrentToday = isToday(item.day, item.month, item.year);
+                                          
+                                          return (
+                                            <button
+                                              key={idx}
+                                              type="button"
+                                              onClick={() => {
+                                                handleInputChange(varName, dateStr);
+                                                setActiveCalendarVar(null);
+                                              }}
+                                              className={`h-7 text-xs font-sans font-medium rounded-md flex items-center justify-center transition-all cursor-pointer ${
+                                                item.isCurrentMonth 
+                                                  ? isSel
+                                                    ? 'bg-black text-white font-semibold'
+                                                    : isCurrentToday
+                                                      ? 'bg-neutral-200 text-black border border-gray-300 font-semibold'
+                                                      : 'bg-white hover:bg-gray-150 text-gray-800 border border-gray-100'
+                                                  : 'text-gray-300 pointer-events-none'
+                                              }`}
+                                            >
+                                              {item.day}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+
+                                      {/* Quick helper buttons */}
+                                      <div className="flex items-center justify-between pt-1 text-[10px] border-t border-gray-100 font-sans">
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            const today = new Date();
+                                            const dateStr = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+                                            handleInputChange(varName, dateStr);
+                                            setActiveCalendarVar(null);
+                                          }}
+                                          className="text-black font-bold hover:underline cursor-pointer"
+                                        >
+                                          Hoje
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => setActiveCalendarVar(null)}
+                                          className="text-gray-400 hover:text-black font-medium cursor-pointer"
+                                        >
+                                          Fechar
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Quick selection presets */}
+                              {presets.length > 0 && (
+                                <div className="space-y-1">
+                                  <span className="block text-[10px] text-gray-400 font-mono">Sugestões rápidas:</span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {presets.map((preset, pIdx) => (
+                                      <button
+                                        key={pIdx}
+                                        type="button"
+                                        onClick={() => handlePresetSelect(varName, preset)}
+                                        className="px-2 py-0.5 text-[10px] text-gray-600 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 rounded transition-all duration-150 text-left font-sans truncate max-w-full cursor-pointer"
+                                        title={preset}
+                                      >
+                                        {preset}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
-                      );
-                    })}
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Bottom main actions */}
+                    <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100 mt-auto">
+                      <button
+                        id="modal-cancel-btn-bottom"
+                        onClick={onClose}
+                        className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-black bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        id="modal-copy-btn-bottom"
+                        onClick={handleCopy}
+                        className={`px-5 py-2 rounded-lg font-sans text-xs font-semibold flex items-center justify-center gap-1.5 transition-all border cursor-pointer ${
+                          copied
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-black hover:bg-neutral-800 text-white border-black'
+                        }`}
+                      >
+                        {copied ? (
+                          <>
+                            <Check size={14} className="animate-bounce text-emerald-600" />
+                            <span>Copiado com Sucesso!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            <span>Copiar Resposta</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Column: High-fidelity document view */}
+                  <div className="lg:col-span-7 flex flex-col min-h-0">
+                    <div className="flex items-center justify-between pb-2 border-b border-gray-100 mb-3">
+                      <span className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wider font-mono">
+                        <Eye size={13} className="text-gray-500" />
+                        Visualização do Texto Final
+                      </span>
+                      <span className="text-[10px] font-mono text-gray-400">
+                        {Object.values(values).filter(Boolean).length} de {variables.length} preenchidas
+                      </span>
+                    </div>
+
+                    <div className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-5 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto max-h-[50vh] min-h-[250px] shadow-inner relative select-text">
+                      {renderLivePreview()}
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <div className="space-y-3 w-full">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wider font-mono pb-2 border-b border-gray-100">
+                    <Eye size={13} className="text-gray-500" />
+                    Conteúdo do Texto
+                  </div>
+                  <div className="bg-[#fcfcfd] p-5 rounded-xl border border-gray-200 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto shadow-inner select-text">
+                    {template.content}
                   </div>
                 </div>
-
-              </div>
-
-              {/* Right Column: High-fidelity document view */}
-              <div className="lg:col-span-7 flex flex-col">
-                <div className="flex items-center justify-between pb-2 border-b border-gray-100 mb-3">
-                  <span className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wider font-mono">
-                    <Eye size={13} className="text-gray-500" />
-                    Visualização do Texto Final
-                  </span>
-                  <span className="text-[10px] font-mono text-gray-400">
-                    {Object.values(values).filter(Boolean).length} de {variables.length} preenchidas
-                  </span>
-                </div>
-
-                <div className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-5 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto max-h-[50vh] min-h-[250px] shadow-inner relative">
-                  {renderLivePreview()}
-                </div>
-              </div>
-
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800 uppercase tracking-wider font-mono pb-2 border-b border-gray-100">
-                <Eye size={13} className="text-gray-500" />
-                Conteúdo do Texto
-              </div>
-              <div className="bg-[#fcfcfd] p-5 rounded-xl border border-gray-200 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto shadow-inner">
-                {template.content}
-              </div>
-            </div>
-          )}
-        </div>
+              )
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
