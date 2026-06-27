@@ -222,6 +222,20 @@ export default function QuickFillModal({
     };
   }, [externalPipWindow]);
 
+  useEffect(() => {
+    if (externalPipWindow) {
+      try {
+        if (isMinimized) {
+          externalPipWindow.resizeTo(280, 54);
+        } else {
+          externalPipWindow.resizeTo(480, 620);
+        }
+      } catch (e) {
+        console.warn('Could not resize external PiP window:', e);
+      }
+    }
+  }, [isMinimized, externalPipWindow]);
+
   const startExternalPip = async () => {
     if (!('documentPictureInPicture' in window)) {
       alert('Seu navegador não oferece suporte nativo ao Picture-in-Picture de Documentos. Para que flutue sobre qualquer outra aba ou aplicativo do computador, use o Google Chrome ou Microsoft Edge!');
@@ -606,6 +620,40 @@ export default function QuickFillModal({
 
   const renderPipContent = () => {
     if (!template) return null;
+
+    if (isMinimized) {
+      return (
+        <div className="bg-black text-white h-screen w-screen flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
+          <button
+            type="button"
+            onClick={() => setIsMinimized(false)}
+            className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer text-white hover:text-gray-200 transition-all focus:outline-hidden truncate flex-1 mr-2 text-left"
+            title="Expandir Assistente"
+          >
+            <Layers size={12} className="text-gray-300 animate-pulse shrink-0" />
+            <span className="truncate">{template.title}</span>
+          </button>
+          
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsMinimized(false)}
+              className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-[10px] rounded-md border border-neutral-700 transition-all cursor-pointer"
+            >
+              Restaurar
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
+              title="Fechar"
+            >
+              <X size={12} />
+            </button>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="bg-white text-gray-950 h-screen w-screen flex flex-col font-sans overflow-hidden select-none antialiased">
