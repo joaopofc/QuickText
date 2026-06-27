@@ -200,6 +200,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
 
   // Real OS-level Document Picture-in-Picture (over other windows/tabs)
   const [externalPipWindow, setExternalPipWindow] = useState<Window | null>(null);
+  const [showNativePipButton, setShowNativePipButton] = useState(true);
 
   useEffect(() => {
     return () => {
@@ -357,6 +358,27 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
       setValues(initialValues);
       setCopied(false);
 
+      // Read custom settings from localStorage
+      let autoOpen = false;
+      let initialTab: 'fill' | 'preview' = 'fill';
+      let nativePipEnabled = true;
+      try {
+        const savedSettings = localStorage.getItem('quick_text_settings');
+        if (savedSettings) {
+          const parsed = JSON.parse(savedSettings);
+          autoOpen = !!parsed.autoOpenPip;
+          nativePipEnabled = parsed.enableNativePip !== false;
+          if (parsed.defaultPipTab === 'fill' || parsed.defaultPipTab === 'preview') {
+            initialTab = parsed.defaultPipTab;
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+
+      setPipTab(initialTab);
+      setShowNativePipButton(nativePipEnabled);
+
       // Auto focus the first variable input for lightning-fast typing
       setTimeout(() => {
         if (extracted.length > 0) {
@@ -366,6 +388,13 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
           }
         }
       }, 100);
+
+      // Auto launch Picture-in-Picture window if enabled and supported
+      if (autoOpen && 'documentPictureInPicture' in window) {
+        setTimeout(() => {
+          startExternalPip();
+        }, 150);
+      }
     }
   }, [template]);
 
@@ -373,9 +402,32 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
 
   const resolvedContent = replaceVariables(template.content, values);
 
+  const fallbackCopyText = (text: string, doc: Document): boolean => {
+    const textArea = doc.createElement("textarea");
+    textArea.value = text;
+    textArea.style.top = "0";
+    textArea.style.left = "0";
+    textArea.style.position = "fixed";
+    textArea.style.opacity = "0";
+    doc.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    let successful = false;
+    try {
+      successful = doc.execCommand('copy');
+    } catch (err) {
+      console.error('Fallback copy failed', err);
+    }
+    doc.body.removeChild(textArea);
+    return successful;
+  };
+
   const performCopy = (valsToCopy: Record<string, string>, shouldClose: boolean = true) => {
     const textToCopy = replaceVariables(template.content, valsToCopy);
-    navigator.clipboard.writeText(textToCopy).then(() => {
+    const targetWindow = externalPipWindow || window;
+    const targetDoc = targetWindow.document;
+
+    const doSuccessActions = () => {
       setCopied(true);
       onCopy(template.id, textToCopy);
       if (shouldClose) {
@@ -388,7 +440,34 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
           setCopied(false);
         }, 1500);
       }
-    });
+    };
+
+    if (targetWindow.navigator && targetWindow.navigator.clipboard && typeof targetWindow.navigator.clipboard.writeText === 'function') {
+      targetWindow.navigator.clipboard.writeText(textToCopy)
+        .then(() => {
+          doSuccessActions();
+        })
+        .catch((err) => {
+          console.warn('Modern clipboard on active window failed, trying fallback...', err);
+          const success = fallbackCopyText(textToCopy, targetDoc);
+          if (success) {
+            doSuccessActions();
+          } else if (navigator.clipboard) {
+            navigator.clipboard.writeText(textToCopy)
+              .then(doSuccessActions)
+              .catch(e => console.error('All clipboard methods failed', e));
+          }
+        });
+    } else {
+      const success = fallbackCopyText(textToCopy, targetDoc);
+      if (success) {
+        doSuccessActions();
+      } else if (navigator.clipboard) {
+        navigator.clipboard.writeText(textToCopy)
+          .then(doSuccessActions)
+          .catch(e => console.error('All fallback clipboard methods failed', e));
+      }
+    }
   };
 
   const handleCopy = () => {
@@ -762,7 +841,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
           {/* Header Actions */}
           <div className="flex items-center gap-1.5 shrink-0 pointer-events-auto">
             {/* Real OS-level Picture-in-Picture */}
-            {('documentPictureInPicture' in window) && (
+            {('documentPictureInPicture' in window) && showNativePipButton && (
               <button
                 type="button"
                 onClick={startExternalPip}

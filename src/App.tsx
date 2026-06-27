@@ -9,7 +9,8 @@ import TemplateForm from './components/TemplateForm';
 import QuickFillModal from './components/QuickFillModal';
 import ConfirmModal from './components/ConfirmModal';
 import PrivacyTermsModal from './components/PrivacyTermsModal';
-import ImportExportModal from './components/ImportExportModal';
+import SettingsModal from './components/SettingsModal';
+import { Settings as SettingsIcon } from 'lucide-react';
 
 export default function App() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -19,7 +20,7 @@ export default function App() {
   const [activeQuickFill, setActiveQuickFill] = useState<Template | null>(null);
   const [globalCopiedAlert, setGlobalCopiedAlert] = useState<string | null>(null);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
-  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   
   // Custom confirmation modal states (replaces blocked window.confirm in iframe)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -137,6 +138,23 @@ export default function App() {
     setTimeout(() => setGlobalCopiedAlert(null), 2000);
   };
 
+  const handleRemoveSamples = () => {
+    const defaultIds = ['tpl-1', 'tpl-2', 'tpl-3', 'tpl-4', 'tpl-5', 'tpl-6'];
+    const updated = templates.filter((t) => !defaultIds.includes(t.id));
+    saveTemplates(updated);
+    setGlobalCopiedAlert('Modelos de amostra removidos!');
+    setTimeout(() => setGlobalCopiedAlert(null), 2000);
+  };
+
+  const handleRestoreSamples = () => {
+    const currentIds = new Set(templates.map((t) => t.id));
+    const toAdd = DEFAULT_TEMPLATES.filter((t) => !currentIds.has(t.id));
+    const updated = [...templates, ...toAdd];
+    saveTemplates(updated);
+    setGlobalCopiedAlert('Modelos de amostra restaurados!');
+    setTimeout(() => setGlobalCopiedAlert(null), 2000);
+  };
+
   // Handle importing data (either merges with current or overwrites)
   const handleImport = (importedTemplates: Template[], overwrite: boolean) => {
     if (overwrite) {
@@ -180,23 +198,13 @@ export default function App() {
           {/* Clean Quick Actions */}
           <div className="flex items-center gap-3">
             <button
-              id="header-reset-defaults-btn"
-              onClick={handleResetDefaults}
-              className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-black transition-colors flex items-center gap-1 cursor-pointer"
-              title="Restaurar dados de exemplo"
+              id="header-settings-btn"
+              onClick={() => setIsSettingsOpen(true)}
+              className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-black bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-md transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
+              title="Abrir configurações de backup, amostras e fixação"
             >
-              <RotateCcw size={12} />
-              <span>Amostras</span>
-            </button>
-
-            <button
-              id="header-sync-btn"
-              onClick={() => setIsImportExportOpen(true)}
-              className="px-2.5 py-1.5 text-[11px] font-semibold text-gray-500 hover:text-black transition-colors flex items-center gap-1 cursor-pointer"
-              title="Sincronizar, Importar ou Exportar templates"
-            >
-              <Download size={12} />
-              <span>Backup / Sincronizar</span>
+              <SettingsIcon size={13} className="text-gray-500" />
+              <span>Configurações</span>
             </button>
 
             <button
@@ -391,11 +399,13 @@ export default function App() {
         onClose={() => setIsPrivacyOpen(false)}
       />
 
-      <ImportExportModal
-        isOpen={isImportExportOpen}
-        onClose={() => setIsImportExportOpen(false)}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
         templates={templates}
         onImport={handleImport}
+        onRemoveSamples={handleRemoveSamples}
+        onRestoreSamples={handleRestoreSamples}
       />
 
       {/* Footer */}
