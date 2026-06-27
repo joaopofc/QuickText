@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers, ExternalLink } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables, replaceVariables, isMultilineVariable } from '../utils/templateHelpers';
 
@@ -197,6 +198,86 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({ startX: 0, startY: 0, posX: 0, posY: 0 });
 
+  // Real OS-level Document Picture-in-Picture (over other windows/tabs)
+  const [externalPipWindow, setExternalPipWindow] = useState<Window | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (externalPipWindow) {
+        try {
+          externalPipWindow.close();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    };
+  }, [externalPipWindow]);
+
+  const startExternalPip = async () => {
+    if (!('documentPictureInPicture' in window)) {
+      alert('Seu navegador não oferece suporte nativo ao Picture-in-Picture de Documentos. Para que flutue sobre qualquer outra aba ou aplicativo do computador, use o Google Chrome ou Microsoft Edge!');
+      return;
+    }
+
+    try {
+      // Close any existing one
+      if (externalPipWindow) {
+        externalPipWindow.close();
+      }
+
+      const pipWin = await (window as any).documentPictureInPicture.requestWindow({
+        width: 480,
+        height: 620,
+      });
+
+      // Copy page stylesheets to style the new PiP window perfectly
+      [...document.styleSheets].forEach((styleSheet) => {
+        try {
+          const style = pipWin.document.createElement('style');
+          let cssText = '';
+          for (const rule of styleSheet.cssRules) {
+            cssText += rule.cssText + '\n';
+          }
+          style.textContent = cssText;
+          pipWin.document.head.appendChild(style);
+        } catch (e) {
+          if (styleSheet.href) {
+            const link = pipWin.document.createElement('link');
+            link.rel = 'stylesheet';
+            link.href = styleSheet.href;
+            pipWin.document.head.appendChild(link);
+          }
+        }
+      });
+
+      // Also copy other styling tags to guarantee tailwind and webfonts are carried over
+      document.querySelectorAll('style').forEach((styleEl) => {
+        pipWin.document.head.appendChild(styleEl.cloneNode(true));
+      });
+
+      // Listen for window closed by user
+      pipWin.addEventListener('pagehide', () => {
+        setExternalPipWindow(null);
+      });
+
+      setExternalPipWindow(pipWin);
+    } catch (err) {
+      console.error('Falha ao abrir Picture-in-Picture externo:', err);
+    }
+  };
+
+  const handleClose = () => {
+    if (externalPipWindow) {
+      try {
+        externalPipWindow.close();
+      } catch (e) {
+        console.error(e);
+      }
+      setExternalPipWindow(null);
+    }
+    onClose();
+  };
+
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('textarea')) {
@@ -300,7 +381,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
       if (shouldClose) {
         setTimeout(() => {
           setCopied(false);
-          onClose(); // Auto-close to keep it rapid
+          handleClose(); // Auto-close to keep it rapid
         }, 1500);
       } else {
         setTimeout(() => {
@@ -436,6 +517,191 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
     });
   };
 
+  const renderPipContent = () => {
+    if (!template) return null;
+
+    return (
+      <div className="bg-white text-gray-950 h-screen w-screen flex flex-col font-sans overflow-hidden select-none antialiased">
+        {/* Header */}
+        <div className="px-4 py-3 bg-[#fcfcfd] border-b border-gray-100 flex items-center justify-between gap-2 shrink-0">
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-sm text-[8px] font-mono font-bold uppercase bg-gray-100 text-gray-600 border border-gray-200 mr-1.5">
+              {template.category}
+            </span>
+            <span className="font-bold text-gray-900 text-xs truncate max-w-[220px] inline-block align-middle" title={template.title}>
+              {template.title}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleClear}
+              className="text-gray-400 hover:text-black flex items-center gap-1 text-[9px] font-mono transition-colors p-1 cursor-pointer"
+              title="Limpar todos os campos"
+            >
+              <RefreshCw size={9} />
+              Limpar
+            </button>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 transition-all border cursor-pointer ${
+                copied
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-3xs'
+                  : 'bg-black hover:bg-neutral-800 text-white border-black shadow-3xs'
+              }`}
+            >
+              {copied ? (
+                <>
+                  <Check size={9} className="text-emerald-600 animate-pulse" />
+                  <span>Copiado!</span>
+                </>
+              ) : (
+                <>
+                  <Copy size={9} />
+                  <span>Copiar</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Tab Selection */}
+        <div className="px-4 py-1.5 border-b border-gray-100 bg-neutral-50 flex items-center justify-between shrink-0">
+          <div className="flex gap-1 bg-gray-200/60 p-0.5 rounded-lg text-[11px] font-medium">
+            <button
+              type="button"
+              onClick={() => setPipTab('fill')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                pipTab === 'fill' 
+                  ? 'bg-white text-black font-semibold shadow-3xs' 
+                  : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              Preencher
+            </button>
+            <button
+              type="button"
+              onClick={() => setPipTab('preview')}
+              className={`px-3 py-1 rounded-md transition-all cursor-pointer ${
+                pipTab === 'preview' 
+                  ? 'bg-white text-black font-semibold shadow-3xs' 
+                  : 'text-gray-500 hover:text-black'
+              }`}
+            >
+              Visualizar
+            </button>
+          </div>
+          
+          <span className="text-[9px] font-mono text-indigo-600 font-bold">MODO FLUTUANTE</span>
+        </div>
+
+        {/* Form / Preview Body */}
+        <div className="flex-1 overflow-y-auto p-4 flex flex-col min-h-0 bg-white">
+          {pipTab === 'fill' ? (
+            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+              {variables.length > 0 ? (
+                variables.map(varName => {
+                  const isFilled = !!values[varName];
+                  const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
+                  const presets = template?.variablePresets?.[varName] || [];
+                  const isDate = isDateVariable(varName);
+
+                  const handleDateInputChange = (valName: string, rawVal: string) => {
+                    const hasLetters = /[a-zA-Z]/.test(rawVal);
+                    if (hasLetters) {
+                      handleInputChange(valName, rawVal);
+                    } else {
+                      const formatted = formatAsDateMask(rawVal);
+                      handleInputChange(valName, formatted);
+                    }
+                  };
+
+                  return (
+                    <div key={varName} className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label
+                          htmlFor={`pip-input-${varName}`}
+                          className="block text-[11px] font-bold text-gray-700 font-mono"
+                        >
+                          {varName} {isMultiline && <span className="text-[10px] text-indigo-500 font-normal font-sans">(Grande)</span>}
+                        </label>
+                        <span className={`text-[9px] font-mono font-bold ${isFilled ? 'text-emerald-600' : 'text-amber-500'}`}>
+                          {isFilled ? 'Preenchido' : 'Pendente'}
+                        </span>
+                      </div>
+                      
+                      {isMultiline ? (
+                        <textarea
+                          id={`pip-input-${varName}`}
+                          placeholder={`Inserir valor para ${varName}...`}
+                          value={values[varName] || ''}
+                          rows={3}
+                          onChange={(e) => handleInputChange(varName, e.target.value)}
+                          className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs resize-y"
+                        />
+                      ) : (
+                        <div className="space-y-2">
+                          <input
+                            id={`pip-input-${varName}`}
+                            type="text"
+                            placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                            value={values[varName] || ''}
+                            onChange={(e) => {
+                              if (isDate) {
+                                handleDateInputChange(varName, e.target.value);
+                              } else {
+                                handleInputChange(varName, e.target.value);
+                              }
+                            }}
+                            onBlur={(e) => {
+                              if (isDate && e.target.value.trim()) {
+                                const formatted = parseAndFormatDate(e.target.value);
+                                if (formatted !== e.target.value) {
+                                  handleInputChange(varName, formatted);
+                                }
+                              }
+                            }}
+                            className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs"
+                          />
+                        </div>
+                      )}
+
+                      {/* Suggestions */}
+                      {presets.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {presets.map((preset, pIdx) => (
+                            <button
+                              key={pIdx}
+                              type="button"
+                              onClick={() => handlePresetSelect(varName, preset)}
+                              className="px-1.5 py-0.5 text-[9px] text-gray-500 bg-gray-50 hover:bg-black hover:text-white border border-gray-200 rounded transition-all max-w-full truncate cursor-pointer font-sans"
+                              title={preset}
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              ) : (
+                <p className="text-xs text-gray-500 italic py-4">Sem variáveis neste template.</p>
+              )}
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col min-h-0 bg-white">
+              <div className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-4 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto shadow-inner select-text">
+                {renderLivePreview()}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div
       id="quick-fill-modal-backdrop"
@@ -495,6 +761,19 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
           
           {/* Header Actions */}
           <div className="flex items-center gap-1.5 shrink-0 pointer-events-auto">
+            {/* Real OS-level Picture-in-Picture */}
+            {('documentPictureInPicture' in window) && (
+              <button
+                type="button"
+                onClick={startExternalPip}
+                className="p-1 px-2 rounded-md text-indigo-600 hover:text-white hover:bg-indigo-600 transition-all cursor-pointer flex items-center justify-center gap-1 text-[10px] font-bold bg-indigo-50 border border-indigo-100"
+                title="Destacar formulário (Sobrepõe outras abas e programas de todo o computador)"
+              >
+                <ExternalLink size={11} />
+                <span>Fixar no Topo</span>
+              </button>
+            )}
+
             {/* Toggle PiP Mode */}
             <button
               type="button"
@@ -530,7 +809,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
             {/* Close */}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="text-gray-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
               title="Fechar painel"
             >
@@ -539,8 +818,51 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
           </div>
         </div>
 
-        {/* Tab Selection (Only in PiP mode when not minimized) */}
-        {isPipMode && !isMinimized && variables.length > 0 && (
+        {externalPipWindow ? (
+          /* --- EXTERNAL PIP ACTIVE INDICATOR --- */
+          <div className="flex-1 flex flex-col items-center justify-center p-6 py-12 text-center bg-slate-50 rounded-b-2xl border-t border-gray-100 min-h-[300px]">
+            <div className="h-14 w-14 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center animate-bounce mb-4 shadow-sm">
+              <ExternalLink size={24} />
+            </div>
+            
+            <div className="space-y-2 max-w-sm mb-6">
+              <h4 className="font-bold text-gray-950 text-sm tracking-tight">
+                Janela Flutuante Externa Ativa!
+              </h4>
+              <p className="text-xs text-gray-600 leading-relaxed">
+                O formulário foi destacado e agora está em uma <strong className="text-indigo-600 font-bold">janela flutuante externa</strong> que sobrepõe outras abas, programas e navegadores do seu computador.
+              </p>
+              <p className="text-[11px] text-gray-400">
+                Você pode preencher as variáveis e copiar o resultado diretamente de lá sem perder o foco do seu trabalho.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (externalPipWindow) {
+                    externalPipWindow.close();
+                    setExternalPipWindow(null);
+                  }
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm transition-all cursor-pointer"
+              >
+                Trazer de Volta
+              </button>
+              <button
+                type="button"
+                onClick={handleClose}
+                className="px-4 py-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-600 font-semibold text-xs rounded-lg transition-all cursor-pointer"
+              >
+                Fechar Painel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Tab Selection (Only in PiP mode when not minimized) */}
+            {isPipMode && !isMinimized && variables.length > 0 && (
           <div className="px-4 py-1.5 border-b border-gray-100 bg-neutral-50 flex items-center justify-between gap-4">
             <div className="flex gap-1 bg-gray-200/60 p-0.5 rounded-lg text-xs font-medium">
               <button
@@ -1101,7 +1423,7 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
                     <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-100 mt-auto">
                       <button
                         id="modal-cancel-btn-bottom"
-                        onClick={onClose}
+                        onClick={handleClose}
                         className="px-4 py-2 text-xs font-semibold text-gray-600 hover:text-black bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors cursor-pointer"
                       >
                         Cancelar
@@ -1161,6 +1483,13 @@ export default function QuickFillModal({ template, onClose, onCopy }: QuickFillM
               )
             )}
           </div>
+        )}
+          </>
+        )}
+
+        {externalPipWindow && createPortal(
+          renderPipContent(),
+          externalPipWindow.document.body
         )}
       </div>
     </div>
