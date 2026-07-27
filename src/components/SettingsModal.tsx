@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Download, Trash2, RotateCcw, Check, Copy, AlertCircle, HelpCircle, Sliders, Database, Eye, FileText, ListOrdered } from 'lucide-react';
+import { X, Copy, Check, AlertCircle, Sliders, Database, Trash2, RotateCcw, FileText, Eye } from 'lucide-react';
 import { Template } from '../types';
 
 interface SettingsModalProps {
@@ -19,7 +19,6 @@ export default function SettingsModal({
   onImport,
   onRemoveSamples,
   onRestoreSamples,
-  onOpenPositionEditor,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'preferences' | 'backup'>('preferences');
   
@@ -35,16 +34,8 @@ export default function SettingsModal({
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [importMode, setImportMode] = useState<'merge' | 'overwrite'>('merge');
 
-  // Help visibility state
-  const [showHelp, setShowHelp] = useState<Record<string, boolean>>({});
-
-  const toggleHelp = (key: string) => {
-    setShowHelp(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
   // Count samples currently loaded
   const sampleCount = templates.filter(t => t.id.startsWith('tpl-')).length;
-  const userCreatedCount = templates.length - sampleCount;
 
   // Load settings on mount / open
   useEffect(() => {
@@ -60,6 +51,9 @@ export default function SettingsModal({
       } catch (e) {
         console.error('Erro ao carregar configurações:', e);
       }
+      setImportError(null);
+      setImportSuccess(null);
+      setImportText('');
     }
   }, [isOpen]);
 
@@ -119,7 +113,7 @@ export default function SettingsModal({
       for (let i = 0; i < list.length; i++) {
         const item = list[i];
         if (!item.title || !item.content) {
-          throw new Error('Todos os templates precisam ter "title" e "content".');
+          throw new Error('Todos os modelos precisam ter "title" e "content".');
         }
         validated.push({
           id: `tpl-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
@@ -135,7 +129,7 @@ export default function SettingsModal({
 
       return validated;
     } catch (e: any) {
-      setImportError('Código inválido ou corrompido. Verifique o formato.');
+      setImportError('Código inválido ou corrompido.');
       return null;
     }
   };
@@ -156,31 +150,8 @@ export default function SettingsModal({
       setTimeout(() => {
         setImportSuccess(null);
         onClose();
-      }, 1500);
+      }, 1200);
     }
-  };
-
-  // Helper buttons to prevent repetitive code
-  const HelpButton = ({ id }: { id: string }) => (
-    <button
-      type="button"
-      onClick={() => toggleHelp(id)}
-      className={`p-1 rounded-md transition-colors cursor-pointer ${
-        showHelp[id] ? 'bg-indigo-50 text-indigo-600' : 'text-gray-400 hover:text-gray-700 hover:bg-gray-100'
-      }`}
-      title="Mais informações"
-    >
-      <HelpCircle size={13} />
-    </button>
-  );
-
-  const HelpText = ({ id, text }: { id: string; text: string }) => {
-    if (!showHelp[id]) return null;
-    return (
-      <div className="p-2.5 bg-indigo-50/75 text-indigo-950 text-[11px] rounded-lg border border-indigo-100/60 leading-relaxed animate-in slide-in-from-top-1 duration-150">
-        {text}
-      </div>
-    );
   };
 
   if (!isOpen) return null;
@@ -188,311 +159,276 @@ export default function SettingsModal({
   return (
     <div
       id="settings-modal-overlay"
-      className="fixed inset-0 bg-black/50 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 select-none"
+      className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         id="settings-modal-content"
-        className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-gray-100"
+        className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150 border border-gray-100 flex flex-col"
       >
-        {/* Header */}
-        <div className="px-5 py-3.5 border-b border-gray-100 flex items-center justify-between shrink-0 bg-neutral-50/80">
-          <div className="flex items-center gap-2">
-            <Settings size={15} className="text-gray-900" />
-            <h2 className="font-sans font-bold text-gray-950 text-xs tracking-tight uppercase font-mono">
+        {/* Minimalist Header */}
+        <div className="px-6 pt-5 pb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-gray-900 tracking-tight font-sans">
               Configurações
             </h2>
+            <p className="text-xs text-gray-400 font-normal">
+              Ajustes do assistente e gerenciamento de dados
+            </p>
           </div>
           <button
             id="settings-close-btn"
             onClick={onClose}
-            className="text-gray-400 hover:text-black transition-colors p-1 rounded-md hover:bg-gray-100 cursor-pointer"
+            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
             title="Fechar"
           >
-            <X size={15} />
+            <X size={16} />
           </button>
         </div>
 
-        {/* Tab Links - Clean, Icon-based */}
-        <div className="flex border-b border-gray-100 bg-neutral-50/30 px-5 shrink-0 text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveTab('preferences')}
-            className={`py-3 px-4 font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'preferences'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-400 hover:text-black'
-            }`}
-          >
-            <Sliders size={13} />
-            <span>Preferências</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('backup')}
-            className={`py-3 px-4 font-bold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
-              activeTab === 'backup'
-                ? 'border-black text-black'
-                : 'border-transparent text-gray-400 hover:text-black'
-            }`}
-          >
-            <Database size={13} />
-            <span>Backup &amp; Sincronização</span>
-          </button>
+        {/* Minimalist Segmented Control Tabs */}
+        <div className="px-6 pb-2">
+          <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setActiveTab('preferences')}
+              className={`flex-1 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'preferences'
+                  ? 'bg-white text-gray-900 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <Sliders size={13} />
+              <span>Preferências</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('backup')}
+              className={`flex-1 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                activeTab === 'backup'
+                  ? 'bg-white text-gray-900 shadow-xs'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              <Database size={13} />
+              <span>Backup &amp; Dados</span>
+            </button>
+          </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 font-sans scrollbar-none max-h-[50vh]">
-          {activeTab === 'preferences' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
-              {/* Picture-in-Picture ("Fixar no Topo") Settings */}
-              <div className="space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
-                    Assistente Flutuante (Fixar)
+        {/* Modal Body */}
+        <div className="p-6 pt-3 space-y-5 overflow-y-auto max-h-[60vh]">
+          {activeTab === 'preferences' ? (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              {/* Option 1: autoOpenPip */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/70 border border-gray-100">
+                <div className="pr-3">
+                  <span className="text-xs font-bold text-gray-800 block">
+                    Destacar automaticamente
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
+                    Abre a janela flutuante ao selecionar um texto para preencher
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={autoOpenPip}
+                    onChange={(e) => handleSaveSettings({ autoOpenPip: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                </label>
+              </div>
+
+              {/* Option 2: enableNativePip */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/70 border border-gray-100">
+                <div className="pr-3">
+                  <span className="text-xs font-bold text-gray-800 block">
+                    Botão "Fixar no Topo"
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
+                    Exibe o atalho para destaque em navegadores compatíveis
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={enableNativePip}
+                    onChange={(e) => handleSaveSettings({ enableNativePip: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                </label>
+              </div>
+
+              {/* Option 3: defaultPipTab */}
+              <div className="p-3 rounded-xl bg-gray-50/70 border border-gray-100 space-y-2">
+                <div>
+                  <span className="text-xs font-bold text-gray-800 block">
+                    Aba inicial do assistente
+                  </span>
+                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
+                    Como o assistente é exibido ao ser aberto
                   </span>
                 </div>
 
-                <div className="space-y-3">
-                  {/* Option 1: autoOpenPip */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={autoOpenPip}
-                          onChange={(e) => handleSaveSettings({ autoOpenPip: e.target.checked })}
-                          className="accent-black h-3.5 w-3.5 rounded border-gray-300 focus:ring-black"
-                        />
-                        <span className="text-xs font-bold text-gray-800 group-hover:text-black transition-colors">
-                          Destacar automaticamente
-                        </span>
-                      </label>
-                      <HelpButton id="pip-auto" />
-                    </div>
-                    <HelpText 
-                      id="pip-auto" 
-                      text="Abre automaticamente o formulário em uma janela flutuante externa ( Picture-in-Picture ) ao selecionar um modelo para preencher." 
-                    />
-                  </div>
-
-                  {/* Option 2: enableNativePip */}
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="flex items-center gap-2.5 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={enableNativePip}
-                          onChange={(e) => handleSaveSettings({ enableNativePip: e.target.checked })}
-                          className="accent-black h-3.5 w-3.5 rounded border-gray-300 focus:ring-black"
-                        />
-                        <span className="text-xs font-bold text-gray-800 group-hover:text-black transition-colors">
-                          Exibir botão "Fixar no Topo"
-                        </span>
-                      </label>
-                      <HelpButton id="pip-btn" />
-                    </div>
-                    <HelpText 
-                      id="pip-btn" 
-                      text="Exibe o botão de destaque manual no formulário. Útil para navegadores compatíveis (Chrome, Edge)." 
-                    />
-                  </div>
-
-                  {/* Option 3: defaultPipTab */}
-                  <div className="space-y-1 pt-1.5 border-t border-gray-50">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-gray-700 block">
-                        Aba inicial do assistente:
-                      </label>
-                      <HelpButton id="pip-tab" />
-                    </div>
-                    
-                    <div className="flex gap-4 pt-1">
-                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="defaultPipTab"
-                          checked={defaultPipTab === 'fill'}
-                          onChange={() => handleSaveSettings({ defaultPipTab: 'fill' })}
-                          className="accent-black"
-                        />
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-gray-700">
-                          <FileText size={11} className="text-gray-400" />
-                          Preencher
-                        </span>
-                      </label>
-                      <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="defaultPipTab"
-                          checked={defaultPipTab === 'preview'}
-                          onChange={() => handleSaveSettings({ defaultPipTab: 'preview' })}
-                          className="accent-black"
-                        />
-                        <span className="flex items-center gap-1 text-[11px] font-medium text-gray-700">
-                          <Eye size={11} className="text-gray-400" />
-                          Visualizar
-                        </span>
-                      </label>
-                    </div>
-
-                    <HelpText 
-                      id="pip-tab" 
-                      text="Define se o assistente flutuante inicia diretamente com o formulário de preenchimento (Preencher) ou no texto resultante (Visualizar)." 
-                    />
-                  </div>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSaveSettings({ defaultPipTab: 'fill' })}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                      defaultPipTab === 'fill'
+                        ? 'bg-black text-white border-black shadow-2xs font-bold'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <FileText size={12} />
+                    <span>Preencher</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveSettings({ defaultPipTab: 'preview' })}
+                    className={`py-1.5 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                      defaultPipTab === 'preview'
+                        ? 'bg-black text-white border-black shadow-2xs font-bold'
+                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                    }`}
+                  >
+                    <Eye size={12} />
+                    <span>Visualizar</span>
+                  </button>
                 </div>
               </div>
 
-              <hr className="border-gray-100" />
-
-              {/* Sample Templates Controls ("Amostras") */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
-                    Modelos de Amostra
+              {/* Option 4: Modelos de Exemplo */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/70 border border-gray-100">
+                <div>
+                  <span className="text-xs font-bold text-gray-800 block">
+                    Modelos de Exemplo
                   </span>
-                  <HelpButton id="samples" />
+                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
+                    {sampleCount > 0 ? 'Modelos padrão ativos' : 'Modelos padrão ocultados'}
+                  </span>
                 </div>
-                
-                <HelpText 
-                  id="samples" 
-                  text="A plataforma inclui modelos de vendas e suporte de amostra por padrão. Você pode removê-los para focar apenas nos seus ou restaurá-los se precisar." 
-                />
 
-                <div className="p-3 bg-neutral-50/80 rounded-lg border border-gray-100 flex items-center justify-between gap-4">
-                  <div className="text-xs">
-                    <p className="font-bold text-gray-800 text-[11px]">
-                      Modelos de Exemplo
-                    </p>
-                    <p className="text-gray-500 text-[10px] font-mono">
-                      {sampleCount > 0 
-                        ? `${sampleCount} ativos / ${userCreatedCount} criados por você` 
-                        : `Ocultados / ${userCreatedCount} criados por você`}
-                    </p>
-                  </div>
-
-                  <div className="shrink-0">
-                    {sampleCount > 0 ? (
-                      <button
-                        type="button"
-                        onClick={onRemoveSamples}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold text-red-600 hover:text-white bg-white hover:bg-red-600 border border-red-200 hover:border-red-600 rounded-lg transition-all cursor-pointer shadow-3xs"
-                      >
-                        <Trash2 size={11} />
-                        <span>Remover</span>
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={onRestoreSamples}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-bold text-gray-700 hover:text-black bg-white hover:bg-gray-50 border border-gray-200 rounded-lg transition-all cursor-pointer shadow-3xs"
-                      >
-                        <RotateCcw size={11} />
-                        <span>Restaurar</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                {sampleCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={onRemoveSamples}
+                    className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                  >
+                    <Trash2 size={12} />
+                    <span>Ocultar</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={onRestoreSamples}
+                    className="px-3 py-1.5 text-xs font-semibold text-gray-700 hover:text-black bg-white hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 shadow-3xs"
+                  >
+                    <RotateCcw size={12} />
+                    <span>Restaurar</span>
+                  </button>
+                )}
               </div>
             </div>
-          )}
-
-          {activeTab === 'backup' && (
-            <div className="space-y-5 animate-in fade-in duration-150">
+          ) : (
+            <div className="space-y-4 animate-in fade-in duration-150">
               {/* Export Panel */}
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
+              <div className="p-3.5 rounded-xl bg-gray-50/70 border border-gray-100 space-y-2.5">
+                <div>
+                  <span className="text-xs font-bold text-gray-900 block">
                     Exportar Backup
                   </span>
-                  <HelpButton id="export" />
+                  <span className="text-[11px] text-gray-400 font-normal block mt-0.5">
+                    Gera um código com todos os seus modelos e posições
+                  </span>
                 </div>
 
-                <HelpText 
-                  id="export" 
-                  text="Copia todos os seus modelos de texto para a área de transferência em formato codificado de segurança para salvar onde desejar." 
-                />
-                
                 <button
                   id="export-btn-copy"
                   onClick={handleCopyCode}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-black hover:bg-neutral-800 text-white rounded-lg transition-colors font-sans text-xs font-bold shadow-3xs cursor-pointer"
+                  className="w-full py-2 px-3 bg-black hover:bg-neutral-800 text-white rounded-lg transition-colors font-sans text-xs font-semibold shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
                 >
                   {copiedCode ? (
-                    <Check size={13} className="text-emerald-400" />
+                    <>
+                      <Check size={13} className="text-emerald-400" />
+                      <span>Copiado com Sucesso!</span>
+                    </>
                   ) : (
-                    <Copy size={13} className="text-gray-300" />
+                    <>
+                      <Copy size={13} />
+                      <span>Copiar Código de Backup</span>
+                    </>
                   )}
-                  <span>{copiedCode ? 'Código Copiado!' : 'Copiar Código de Backup'}</span>
                 </button>
               </div>
 
-              <hr className="border-gray-100" />
-
               {/* Import Panel */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider font-mono">
+              <div className="p-3.5 rounded-xl bg-gray-50/70 border border-gray-100 space-y-3">
+                <div>
+                  <span className="text-xs font-bold text-gray-900 block">
                     Importar Backup
                   </span>
-                  <HelpButton id="import" />
+                  <span className="text-[11px] text-gray-400 font-normal block mt-0.5">
+                    Restaure seus modelos colando um código de backup
+                  </span>
                 </div>
 
-                <HelpText 
-                  id="import" 
-                  text="Insira o código de backup gerado anteriormente para restaurar ou mesclar seus modelos de texto." 
-                />
-                
-                <div className="space-y-2">
-                  <div className="flex items-center gap-4 bg-neutral-50 p-2 rounded-md border border-gray-100 text-[11px]">
-                    <span className="font-bold text-gray-700 font-mono">Modo:</span>
-                    <label className="flex items-center gap-1 text-gray-600 cursor-pointer font-medium">
-                      <input
-                        type="radio"
-                        name="settingsImportMode"
-                        checked={importMode === 'merge'}
-                        onChange={() => setImportMode('merge')}
-                        className="accent-black"
-                      />
-                      <span>Mesclar</span>
-                    </label>
-                    <label className="flex items-center gap-1 text-gray-600 cursor-pointer font-medium">
-                      <input
-                        type="radio"
-                        name="settingsImportMode"
-                        checked={importMode === 'overwrite'}
-                        onChange={() => setImportMode('overwrite')}
-                        className="accent-black"
-                      />
-                      <span className="text-red-600">Sobrescrever</span>
-                    </label>
-                  </div>
-
-                  <textarea
-                    rows={3}
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    placeholder="Cole aqui o código de transferência ou backup..."
-                    className="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs font-mono focus:border-black focus:outline-hidden bg-white text-gray-800 resize-none shadow-3xs"
-                  />
+                {/* Import Mode Switcher */}
+                <div className="grid grid-cols-2 gap-1.5 bg-white p-1 rounded-lg border border-gray-200 text-xs font-medium">
                   <button
-                    onClick={handleImportSubmit}
-                    className="w-full py-2 bg-black hover:bg-neutral-800 text-white text-xs font-bold rounded-lg transition-colors shadow-3xs cursor-pointer"
+                    type="button"
+                    onClick={() => setImportMode('merge')}
+                    className={`py-1 rounded-md transition-all cursor-pointer text-center text-[11px] ${
+                      importMode === 'merge'
+                        ? 'bg-gray-100 text-gray-900 font-bold'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
                   >
-                    Confirmar Importação
+                    Mesclar aos atuais
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('overwrite')}
+                    className={`py-1 rounded-md transition-all cursor-pointer text-center text-[11px] ${
+                      importMode === 'overwrite'
+                        ? 'bg-rose-50 text-rose-700 font-bold'
+                        : 'text-gray-500 hover:text-rose-600'
+                    }`}
+                  >
+                    Substituir tudo
                   </button>
                 </div>
 
+                <textarea
+                  rows={2}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                  placeholder="Cole o código de backup aqui..."
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono focus:border-black focus:outline-hidden bg-white text-gray-800 resize-none shadow-3xs placeholder:text-gray-300"
+                />
+
+                <button
+                  onClick={handleImportSubmit}
+                  className="w-full py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer"
+                >
+                  Importar Backup
+                </button>
+
                 {importError && (
-                  <div className="p-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs flex items-start gap-2">
-                    <AlertCircle size={13} className="shrink-0 mt-0.5" />
+                  <div className="p-2 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs flex items-center gap-1.5">
+                    <AlertCircle size={13} className="shrink-0" />
                     <span>{importError}</span>
                   </div>
                 )}
 
                 {importSuccess && (
-                  <div className="p-2.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-lg text-xs flex items-start gap-2">
-                    <Check size={13} className="shrink-0 mt-0.5" />
+                  <div className="p-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs flex items-center gap-1.5">
+                    <Check size={13} className="shrink-0 text-emerald-600" />
                     <span>{importSuccess}</span>
                   </div>
                 )}
@@ -501,17 +437,18 @@ export default function SettingsModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-3.5 bg-neutral-50/80 flex items-center justify-end shrink-0 border-t border-gray-100">
+        {/* Minimalist Footer */}
+        <div className="px-6 py-3.5 bg-gray-50/50 flex items-center justify-end shrink-0 border-t border-gray-100">
           <button
             id="settings-done-btn"
             onClick={onClose}
-            className="px-4 py-1.5 bg-black hover:bg-neutral-800 text-white font-sans text-xs font-bold rounded-lg shadow-sm transition-colors cursor-pointer"
+            className="px-5 py-1.5 bg-black hover:bg-neutral-800 text-white font-sans text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
           >
-            Concluir
+            Concluído
           </button>
         </div>
       </div>
     </div>
   );
 }
+
