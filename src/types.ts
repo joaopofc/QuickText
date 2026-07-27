@@ -6,6 +6,7 @@ export interface Template {
   usageCount: number;
   createdAt: string;
   variablePresets?: Record<string, string[]>;
+  order?: number;
 }
 
 export interface VariableValue {

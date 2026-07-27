@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, RotateCcw, FileText, Check, Search, Trash2, Download } from 'lucide-react';
+import { Plus, RotateCcw, FileText, Check, Search, Trash2, Download, ListOrdered, Settings as SettingsIcon } from 'lucide-react';
 import { Template } from './types';
 import { DEFAULT_TEMPLATES, AVAILABLE_CATEGORIES } from './defaultTemplates';
 import { extractVariables } from './utils/templateHelpers';
@@ -10,7 +10,7 @@ import QuickFillModal from './components/QuickFillModal';
 import ConfirmModal from './components/ConfirmModal';
 import PrivacyTermsModal from './components/PrivacyTermsModal';
 import SettingsModal from './components/SettingsModal';
-import { Settings as SettingsIcon } from 'lucide-react';
+import PositionEditorModal from './components/PositionEditorModal';
 
 export default function App() {
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -21,6 +21,7 @@ export default function App() {
   const [globalCopiedAlert, setGlobalCopiedAlert] = useState<string | null>(null);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPositionEditorOpen, setIsPositionEditorOpen] = useState(false);
   
   // Custom confirmation modal states (replaces blocked window.confirm in iframe)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
@@ -180,6 +181,94 @@ export default function App() {
     return templates.filter((t) => t.category === selectedCategory);
   }, [templates, selectedCategory]);
 
+  // Drag and drop card reordering state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
+  const handleCardDragStart = (_e: React.DragEvent, id: string, index: number) => {
+    setDraggedIndex(index);
+  };
+
+  const handleCardDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index);
+    }
+  };
+
+  const handleCardDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
+
+  const handleCardDrop = (e: React.DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === dropIndex) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const updated = [...templates];
+    const draggedItem = filteredTemplates[draggedIndex];
+    const dropItem = filteredTemplates[dropIndex];
+
+    if (!draggedItem || !dropItem) {
+      setDraggedIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const realDraggedIdx = updated.findIndex((t) => t.id === draggedItem.id);
+    const realDropIdx = updated.findIndex((t) => t.id === dropItem.id);
+
+    if (realDraggedIdx !== -1 && realDropIdx !== -1) {
+      const [moved] = updated.splice(realDraggedIdx, 1);
+      updated.splice(realDropIdx, 0, moved);
+
+      // Re-index order property
+      const reindexed = updated.map((t, idx) => ({
+        ...t,
+        order: idx + 1,
+      }));
+
+      saveTemplates(reindexed);
+      setGlobalCopiedAlert(`Texto "${moved.title}" movido para a posição #${realDropIdx + 1}!`);
+      setTimeout(() => setGlobalCopiedAlert(null), 2500);
+    }
+
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleCardDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleMovePosition = (fromIndex: number, toIndex: number) => {
+    if (toIndex < 0 || toIndex >= filteredTemplates.length) return;
+    const updated = [...templates];
+    const fromItem = filteredTemplates[fromIndex];
+    const toItem = filteredTemplates[toIndex];
+
+    const realFrom = updated.findIndex((t) => t.id === fromItem.id);
+    const realTo = updated.findIndex((t) => t.id === toItem.id);
+
+    if (realFrom !== -1 && realTo !== -1) {
+      const [moved] = updated.splice(realFrom, 1);
+      updated.splice(realTo, 0, moved);
+
+      const reindexed = updated.map((t, idx) => ({
+        ...t,
+        order: idx + 1,
+      }));
+
+      saveTemplates(reindexed);
+      setGlobalCopiedAlert(`Posição alterada para #${realTo + 1}`);
+      setTimeout(() => setGlobalCopiedAlert(null), 2000);
+    }
+  };
+
   return (
     <div id="main-app-container" className="min-h-screen bg-[#fafafb] flex flex-col font-sans selection:bg-black selection:text-white">
       
@@ -196,7 +285,7 @@ export default function App() {
           </div>
 
           {/* Clean Quick Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5">
             <button
               id="header-settings-btn"
               onClick={() => setIsSettingsOpen(true)}
@@ -316,14 +405,24 @@ export default function App() {
         <section id="grid-list-section" className="max-w-5xl mx-auto">
           {filteredTemplates.length > 0 ? (
             <div id="templates-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {filteredTemplates.map((template) => (
+              {filteredTemplates.map((template, idx) => (
                 <TemplateCard
                   key={template.id}
                   template={template}
+                  index={idx}
+                  totalCount={filteredTemplates.length}
                   onCopy={handleCopy}
                   onEdit={handleEditInit}
                   onDelete={handleDelete}
                   onQuickFill={(tpl) => setActiveQuickFill(tpl)}
+                  isDragging={draggedIndex === idx}
+                  isDragOver={dragOverIndex === idx}
+                  onDragStart={handleCardDragStart}
+                  onDragOver={handleCardDragOver}
+                  onDragLeave={handleCardDragLeave}
+                  onDrop={handleCardDrop}
+                  onDragEnd={handleCardDragEnd}
+                  onMovePosition={handleMovePosition}
                 />
               ))}
             </div>
@@ -408,6 +507,18 @@ export default function App() {
         onImport={handleImport}
         onRemoveSamples={handleRemoveSamples}
         onRestoreSamples={handleRestoreSamples}
+        onOpenPositionEditor={() => setIsPositionEditorOpen(true)}
+      />
+
+      <PositionEditorModal
+        isOpen={isPositionEditorOpen}
+        onClose={() => setIsPositionEditorOpen(false)}
+        templates={templates}
+        onSavePositions={(reordered) => {
+          saveTemplates(reordered);
+          setGlobalCopiedAlert('Posições dos textos salvas com sucesso!');
+          setTimeout(() => setGlobalCopiedAlert(null), 2000);
+        }}
       />
 
       {/* Footer */}

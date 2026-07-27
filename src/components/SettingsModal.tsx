@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Settings, Download, Trash2, RotateCcw, Check, Copy, AlertCircle, HelpCircle, Sliders, Database, Eye, FileText } from 'lucide-react';
+import { X, Settings, Download, Trash2, RotateCcw, Check, Copy, AlertCircle, HelpCircle, Sliders, Database, Eye, FileText, ListOrdered } from 'lucide-react';
 import { Template } from '../types';
 
 interface SettingsModalProps {
@@ -9,6 +9,7 @@ interface SettingsModalProps {
   onImport: (importedTemplates: Template[], overwrite: boolean) => void;
   onRemoveSamples: () => void;
   onRestoreSamples: () => void;
+  onOpenPositionEditor?: () => void;
 }
 
 export default function SettingsModal({
@@ -18,6 +19,7 @@ export default function SettingsModal({
   onImport,
   onRemoveSamples,
   onRestoreSamples,
+  onOpenPositionEditor,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'preferences' | 'backup'>('preferences');
   
@@ -76,14 +78,15 @@ export default function SettingsModal({
     localStorage.setItem('quick_text_settings', JSON.stringify(nextSettings));
   };
 
-  // Generate Base64
+  // Generate Base64 (preserves position order)
   const getBase64Data = () => {
     try {
-      const cleanData = templates.map(({ title, content, category, variablePresets }) => ({
+      const cleanData = templates.map(({ title, content, category, variablePresets, order }, idx) => ({
         title,
         content,
         category,
-        variablePresets: variablePresets || {}
+        variablePresets: variablePresets || {},
+        order: typeof order === 'number' ? order : idx + 1,
       }));
       const jsonStr = JSON.stringify(cleanData);
       return btoa(unescape(encodeURIComponent(jsonStr)));
@@ -113,7 +116,8 @@ export default function SettingsModal({
       const list = Array.isArray(parsed) ? parsed : [parsed];
       const validated: Template[] = [];
 
-      for (const item of list) {
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
         if (!item.title || !item.content) {
           throw new Error('Todos os templates precisam ter "title" e "content".');
         }
@@ -124,7 +128,8 @@ export default function SettingsModal({
           category: String(item.category || 'Geral'),
           usageCount: Number(item.usageCount || 0),
           createdAt: new Date().toISOString(),
-          variablePresets: item.variablePresets || {}
+          variablePresets: item.variablePresets || {},
+          order: typeof item.order === 'number' ? item.order : i + 1,
         });
       }
 
