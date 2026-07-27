@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Check, Edit2, Trash2, ArrowUpRight, GripVertical, ArrowUp, ArrowDown } from 'lucide-react';
+import { Copy, Check, Edit2, Trash2, ArrowUpRight, GripVertical } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables } from '../utils/templateHelpers';
 
@@ -60,9 +60,6 @@ export default function TemplateCard({
     }
   };
 
-  const isFirst = index === 0;
-  const isLast = index === totalCount - 1;
-
   return (
     <div
       id={`template-card-${template.id}`}
@@ -122,42 +119,8 @@ export default function TemplateCard({
           </div>
         </div>
 
-        {/* Header Action Buttons (Quick Move & Edit/Delete) */}
+        {/* Header Action Buttons (Edit/Delete) */}
         <div className="flex items-center gap-0.5 shrink-0">
-          {/* Quick Position Shift Buttons for touch / precision */}
-          {onMovePosition && (
-            <div className="flex items-center gap-0.5 bg-gray-50 p-0.5 rounded-md border border-gray-200/60 opacity-80 group-hover:opacity-100 transition-opacity">
-              <button
-                type="button"
-                disabled={isFirst}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMovePosition(index, index - 1);
-                }}
-                className={`p-0.5 rounded-sm transition-colors ${
-                  isFirst ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-black hover:bg-white'
-                }`}
-                title="Mover uma posição acima"
-              >
-                <ArrowUp size={12} />
-              </button>
-              <button
-                type="button"
-                disabled={isLast}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMovePosition(index, index + 1);
-                }}
-                className={`p-0.5 rounded-sm transition-colors ${
-                  isLast ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:text-black hover:bg-white'
-                }`}
-                title="Mover uma posição abaixo"
-              >
-                <ArrowDown size={12} />
-              </button>
-            </div>
-          )}
-
           <button
             id={`edit-btn-${template.id}`}
             onClick={(e) => {
