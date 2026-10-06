@@ -42,6 +42,7 @@ export default function TemplateCard({
 }: TemplateCardProps) {
   const [copied, setCopied] = useState(false);
   const [hasVariables, setHasVariables] = useState(false);
+  const [isReadyToDrag, setIsReadyToDrag] = useState(false);
 
   useEffect(() => {
     const vars = extractVariables(template.content);
@@ -63,12 +64,15 @@ export default function TemplateCard({
   return (
     <div
       id={`template-card-${template.id}`}
-      draggable
+      draggable={isReadyToDrag}
       onDragStart={(e) => onDragStart && onDragStart(e, template.id, index)}
       onDragOver={(e) => onDragOver && onDragOver(e, index)}
       onDragLeave={(e) => onDragLeave && onDragLeave(e)}
       onDrop={(e) => onDrop && onDrop(e, index)}
-      onDragEnd={() => onDragEnd && onDragEnd()}
+      onDragEnd={() => {
+        setIsReadyToDrag(false);
+        onDragEnd && onDragEnd();
+      }}
       onClick={handleCardClick}
       className={`bg-white border rounded-xl transition-all duration-150 flex flex-col justify-between cursor-pointer group relative ${
         isDragging
@@ -95,6 +99,10 @@ export default function TemplateCard({
             className="p-1 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md cursor-grab active:cursor-grabbing transition-colors flex items-center gap-0.5 shrink-0"
             title="Arraste este botão para mudar o texto de lugar"
             onClick={(e) => e.stopPropagation()}
+            onMouseDown={() => setIsReadyToDrag(true)}
+            onMouseUp={() => setIsReadyToDrag(false)}
+            onTouchStart={() => setIsReadyToDrag(true)}
+            onTouchEnd={() => setIsReadyToDrag(false)}
           >
             <GripVertical size={14} className="text-gray-400 group-hover:text-gray-700" />
             <span className="text-[10px] font-mono font-bold text-gray-400">

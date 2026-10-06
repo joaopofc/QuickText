@@ -159,48 +159,48 @@ export default function SettingsModal({
   return (
     <div
       id="settings-modal-overlay"
-      className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-150 select-none"
+      className="fixed inset-0 bg-black/30 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-in fade-in duration-200 select-none"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
         id="settings-modal-content"
-        className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-150 border border-gray-100 flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden animate-in zoom-in-95 duration-200 border border-neutral-100 flex flex-col"
       >
-        {/* Minimalist Header */}
-        <div className="px-6 pt-5 pb-4 flex items-center justify-between">
+        {/* Sleek Header */}
+        <div className="px-6 pt-6 pb-4 flex items-center justify-between border-b border-neutral-50">
           <div>
-            <h2 className="text-base font-bold text-gray-900 tracking-tight font-sans">
+            <h2 className="text-sm font-bold text-neutral-900 tracking-tight font-sans">
               Configurações
             </h2>
-            <p className="text-xs text-gray-400 font-normal">
-              Ajustes do assistente e gerenciamento de dados
+            <p className="text-[11px] text-neutral-400 font-normal">
+              Ajustes finos do assistente e seus dados
             </p>
           </div>
           <button
             id="settings-close-btn"
             onClick={onClose}
-            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-neutral-400 hover:text-neutral-900 hover:bg-neutral-50 rounded-lg transition-colors cursor-pointer"
             title="Fechar"
           >
-            <X size={16} />
+            <X size={14} />
           </button>
         </div>
 
-        {/* Minimalist Segmented Control Tabs */}
-        <div className="px-6 pb-2">
-          <div className="bg-gray-100/80 p-1 rounded-xl flex items-center gap-1 text-xs font-semibold">
+        {/* Minimalist Tab Navigation */}
+        <div className="px-6 pt-3 pb-1">
+          <div className="bg-neutral-50 p-0.5 rounded-xl flex items-center gap-1 text-[11px] font-semibold border border-neutral-100/50">
             <button
               type="button"
               onClick={() => setActiveTab('preferences')}
               className={`flex-1 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'preferences'
-                  ? 'bg-white text-gray-900 shadow-xs'
-                  : 'text-gray-500 hover:text-gray-900'
+                  ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
+                  : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
-              <Sliders size={13} />
+              <Sliders size={12} />
               <span>Preferências</span>
             </button>
             <button
@@ -208,109 +208,117 @@ export default function SettingsModal({
               onClick={() => setActiveTab('backup')}
               className={`flex-1 py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
                 activeTab === 'backup'
-                  ? 'bg-white text-gray-900 shadow-xs'
-                  : 'text-gray-500 hover:text-gray-900'
+                  ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
+                  : 'text-neutral-500 hover:text-neutral-900'
               }`}
             >
-              <Database size={13} />
+              <Database size={12} />
               <span>Backup &amp; Dados</span>
             </button>
           </div>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 pt-3 space-y-5 overflow-y-auto max-h-[60vh]">
+        <div className="p-6 space-y-5 overflow-y-auto max-h-[60vh] min-h-[300px]">
           {activeTab === 'preferences' ? (
-            <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="space-y-4 animate-in fade-in duration-200">
               {/* Option 1: autoOpenPip */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/70 border border-gray-100">
+              <div className="flex items-center justify-between py-1">
                 <div className="pr-3">
-                  <span className="text-xs font-bold text-gray-800 block">
-                    Destacar automaticamente
+                  <span className="text-[12px] font-semibold text-neutral-800 block">
+                    Destaque automático
                   </span>
-                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
-                    Abre a janela flutuante ao selecionar um texto para preencher
+                  <span className="text-[10px] text-neutral-400 font-normal leading-normal block mt-0.5 max-w-[220px]">
+                    Inicia a janela flutuante de forma instantânea ao preencher
                   </span>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
                   <input
                     type="checkbox"
                     checked={autoOpenPip}
                     onChange={(e) => handleSaveSettings({ autoOpenPip: e.target.checked })}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                  <div className="w-9 h-5.5 bg-neutral-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:bg-neutral-900 shadow-3xs"></div>
                 </label>
               </div>
 
+              <div className="h-[1px] bg-neutral-100/70" />
+
               {/* Option 2: enableNativePip */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/70 border border-gray-100">
+              <div className="flex items-center justify-between py-1">
                 <div className="pr-3">
-                  <span className="text-xs font-bold text-gray-800 block">
+                  <span className="text-[12px] font-semibold text-neutral-800 block">
                     Botão "Fixar no Topo"
                   </span>
-                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
-                    Exibe o atalho para destaque em navegadores compatíveis
+                  <span className="text-[10px] text-neutral-400 font-normal leading-normal block mt-0.5 max-w-[220px]">
+                    Mostra o atalho do PiP nativo em navegadores compatíveis
                   </span>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
                   <input
                     type="checkbox"
                     checked={enableNativePip}
                     onChange={(e) => handleSaveSettings({ enableNativePip: e.target.checked })}
                     className="sr-only peer"
                   />
-                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-black"></div>
+                  <div className="w-9 h-5.5 bg-neutral-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:bg-neutral-900 shadow-3xs"></div>
                 </label>
               </div>
 
+              <div className="h-[1px] bg-neutral-100/70" />
+
               {/* Option 3: defaultPipTab */}
-              <div className="p-3 rounded-xl bg-gray-50/70 border border-gray-100 space-y-2">
+              <div className="py-1 space-y-2">
                 <div>
-                  <span className="text-xs font-bold text-gray-800 block">
+                  <span className="text-[12px] font-semibold text-neutral-800 block">
                     Aba inicial do assistente
                   </span>
-                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
-                    Como o assistente é exibido ao ser aberto
+                  <span className="text-[10px] text-neutral-400 font-normal leading-normal block mt-0.5">
+                    Modo padrão do painel ao ser acionado
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="flex bg-neutral-50 p-0.5 rounded-lg border border-neutral-100/50 text-[10px] font-semibold">
                   <button
                     type="button"
                     onClick={() => handleSaveSettings({ defaultPipTab: 'fill' })}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                    className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center font-medium flex items-center justify-center gap-1.5 ${
                       defaultPipTab === 'fill'
-                        ? 'bg-black text-white border-black shadow-2xs font-bold'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                        ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
+                        : 'text-neutral-500 hover:text-neutral-950'
                     }`}
                   >
-                    <FileText size={12} />
+                    <FileText size={11} />
                     <span>Preencher</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleSaveSettings({ defaultPipTab: 'preview' })}
-                    className={`py-1.5 px-3 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                    className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center font-medium flex items-center justify-center gap-1.5 ${
                       defaultPipTab === 'preview'
-                        ? 'bg-black text-white border-black shadow-2xs font-bold'
-                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-100'
+                        ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
+                        : 'text-neutral-500 hover:text-neutral-950'
                     }`}
                   >
-                    <Eye size={12} />
+                    <Eye size={11} />
                     <span>Visualizar</span>
                   </button>
                 </div>
               </div>
 
+              <div className="h-[1px] bg-neutral-100/70" />
+
               {/* Option 4: Modelos de Exemplo */}
-              <div className="flex items-center justify-between p-3 rounded-xl bg-gray-50/70 border border-gray-100">
+              <div className="flex items-center justify-between py-1">
                 <div>
-                  <span className="text-xs font-bold text-gray-800 block">
-                    Modelos de Exemplo
+                  <span className="text-[12px] font-semibold text-neutral-800 block">
+                    Modelos de Amostra
                   </span>
-                  <span className="text-[11px] text-gray-400 font-normal leading-tight block mt-0.5">
-                    {sampleCount > 0 ? 'Modelos padrão ativos' : 'Modelos padrão ocultados'}
+                  <span className="text-[10px] text-neutral-400 font-normal leading-normal block mt-0.5 max-w-[200px]">
+                    {sampleCount > 0 
+                      ? `Há ${sampleCount} modelos de amostra integrados ativos` 
+                      : 'Modelos de amostra originais estão ocultados'}
                   </span>
                 </div>
 
@@ -318,117 +326,124 @@ export default function SettingsModal({
                   <button
                     type="button"
                     onClick={onRemoveSamples}
-                    className="px-3 py-1.5 text-xs font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200/60 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                    className="px-2.5 py-1.5 text-[10px] font-bold text-neutral-600 hover:text-red-600 bg-neutral-50 hover:bg-red-50 border border-neutral-200/60 hover:border-red-100 rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={11} />
                     <span>Ocultar</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={onRestoreSamples}
-                    className="px-3 py-1.5 text-xs font-semibold text-gray-700 hover:text-black bg-white hover:bg-gray-100 border border-gray-200 rounded-lg transition-colors flex items-center gap-1 cursor-pointer shrink-0 shadow-3xs"
+                    className="px-2.5 py-1.5 text-[10px] font-bold text-neutral-700 hover:text-neutral-950 bg-white hover:bg-neutral-50 border border-neutral-200 rounded-lg transition-all flex items-center gap-1 cursor-pointer shrink-0 shadow-3xs"
                   >
-                    <RotateCcw size={12} />
+                    <RotateCcw size={11} />
                     <span>Restaurar</span>
                   </button>
                 )}
               </div>
             </div>
           ) : (
-            <div className="space-y-4 animate-in fade-in duration-150">
+            <div className="space-y-4 animate-in fade-in duration-200">
               {/* Export Panel */}
-              <div className="p-3.5 rounded-xl bg-gray-50/70 border border-gray-100 space-y-2.5">
+              <div className="space-y-2">
                 <div>
-                  <span className="text-xs font-bold text-gray-900 block">
+                  <span className="text-[12px] font-semibold text-neutral-900 block">
                     Exportar Backup
                   </span>
-                  <span className="text-[11px] text-gray-400 font-normal block mt-0.5">
-                    Gera um código com todos os seus modelos e posições
+                  <span className="text-[10px] text-neutral-400 font-normal block mt-0.5">
+                    Gera uma assinatura segura codificada com seus modelos
                   </span>
                 </div>
 
                 <button
                   id="export-btn-copy"
                   onClick={handleCopyCode}
-                  className="w-full py-2 px-3 bg-black hover:bg-neutral-800 text-white rounded-lg transition-colors font-sans text-xs font-semibold shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-1.5 px-3 bg-neutral-950 hover:bg-neutral-900 text-white rounded-lg transition-all font-sans text-[11px] font-bold shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   {copiedCode ? (
                     <>
-                      <Check size={13} className="text-emerald-400" />
+                      <Check size={12} className="text-emerald-400 animate-pulse" />
                       <span>Copiado com Sucesso!</span>
                     </>
                   ) : (
                     <>
-                      <Copy size={13} />
-                      <span>Copiar Código de Backup</span>
+                      <Copy size={12} />
+                      <span>Copiar Chave de Backup</span>
                     </>
                   )}
                 </button>
               </div>
 
+              <div className="h-[1px] bg-neutral-100/70" />
+
               {/* Import Panel */}
-              <div className="p-3.5 rounded-xl bg-gray-50/70 border border-gray-100 space-y-3">
-                <div>
-                  <span className="text-xs font-bold text-gray-900 block">
-                    Importar Backup
-                  </span>
-                  <span className="text-[11px] text-gray-400 font-normal block mt-0.5">
-                    Restaure seus modelos colando um código de backup
-                  </span>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[12px] font-semibold text-neutral-900 block">
+                      Importar Backup
+                    </span>
+                    <span className="text-[10px] text-neutral-400 font-normal block mt-0.5">
+                      Restaure modelos a partir de um código anterior
+                    </span>
+                  </div>
                 </div>
 
                 {/* Import Mode Switcher */}
-                <div className="grid grid-cols-2 gap-1.5 bg-white p-1 rounded-lg border border-gray-200 text-xs font-medium">
+                <div className="flex bg-neutral-50 p-0.5 rounded-lg border border-neutral-100/50 text-[10px] font-semibold">
                   <button
                     type="button"
                     onClick={() => setImportMode('merge')}
-                    className={`py-1 rounded-md transition-all cursor-pointer text-center text-[11px] ${
+                    className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center ${
                       importMode === 'merge'
-                        ? 'bg-gray-100 text-gray-900 font-bold'
-                        : 'text-gray-500 hover:text-gray-900'
+                        ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
+                        : 'text-neutral-400 hover:text-neutral-800'
                     }`}
                   >
-                    Mesclar aos atuais
+                    Mesclar ao atual
                   </button>
                   <button
                     type="button"
                     onClick={() => setImportMode('overwrite')}
-                    className={`py-1 rounded-md transition-all cursor-pointer text-center text-[11px] ${
+                    className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center ${
                       importMode === 'overwrite'
-                        ? 'bg-rose-50 text-rose-700 font-bold'
-                        : 'text-gray-500 hover:text-rose-600'
+                        ? 'bg-white text-red-700 shadow-3xs font-bold border border-red-100/30'
+                        : 'text-neutral-400 hover:text-red-500'
                     }`}
                   >
                     Substituir tudo
                   </button>
                 </div>
 
-                <textarea
-                  rows={2}
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  placeholder="Cole o código de backup aqui..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-mono focus:border-black focus:outline-hidden bg-white text-gray-800 resize-none shadow-3xs placeholder:text-gray-300"
-                />
+                <div className="relative">
+                  <textarea
+                    rows={2}
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    placeholder="Cole seu código de sincronização ou backup aqui..."
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-[10px] font-mono focus:border-neutral-950 focus:outline-hidden bg-neutral-50/50 text-neutral-800 resize-none shadow-inner placeholder:text-neutral-300"
+                  />
+                </div>
 
                 <button
                   onClick={handleImportSubmit}
-                  className="w-full py-1.5 bg-gray-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition-colors shadow-2xs cursor-pointer"
+                  className="w-full py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-850 hover:text-neutral-950 text-[11px] font-bold rounded-lg transition-all cursor-pointer border border-neutral-200/50 flex items-center justify-center gap-1.5"
                 >
-                  Importar Backup
+                  <Database size={11} />
+                  <span>Validar e Importar</span>
                 </button>
 
                 {importError && (
-                  <div className="p-2 bg-rose-50 text-rose-600 border border-rose-100 rounded-lg text-xs flex items-center gap-1.5">
-                    <AlertCircle size={13} className="shrink-0" />
+                  <div className="p-2 bg-red-50 text-red-600 border border-red-100/60 rounded-lg text-[10px] flex items-center gap-1.5 animate-in fade-in duration-200">
+                    <AlertCircle size={12} className="shrink-0" />
                     <span>{importError}</span>
                   </div>
                 )}
 
                 {importSuccess && (
-                  <div className="p-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-lg text-xs flex items-center gap-1.5">
-                    <Check size={13} className="shrink-0 text-emerald-600" />
+                  <div className="p-2 bg-emerald-50 text-emerald-700 border border-emerald-100/60 rounded-lg text-[10px] flex items-center gap-1.5 animate-in fade-in duration-200">
+                    <Check size={12} className="shrink-0 text-emerald-600" />
                     <span>{importSuccess}</span>
                   </div>
                 )}
@@ -438,11 +453,11 @@ export default function SettingsModal({
         </div>
 
         {/* Minimalist Footer */}
-        <div className="px-6 py-3.5 bg-gray-50/50 flex items-center justify-end shrink-0 border-t border-gray-100">
+        <div className="px-6 py-4 bg-neutral-50/50 flex items-center justify-end shrink-0 border-t border-neutral-100">
           <button
             id="settings-done-btn"
             onClick={onClose}
-            className="px-5 py-1.5 bg-black hover:bg-neutral-800 text-white font-sans text-xs font-semibold rounded-lg shadow-2xs transition-colors cursor-pointer"
+            className="px-4 py-1.5 bg-neutral-950 hover:bg-neutral-900 text-white font-sans text-[11px] font-bold rounded-lg shadow-3xs transition-all cursor-pointer"
           >
             Concluído
           </button>

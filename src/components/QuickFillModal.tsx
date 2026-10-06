@@ -542,10 +542,11 @@ export default function QuickFillModal({
 
       if (!isLastField) {
         const nextVar = variables[idx + 1];
+        const targetDoc = e.currentTarget.ownerDocument || document;
         setTimeout(() => {
-          const nextElement = document.getElementById(`modal-input-${nextVar}`);
+          const nextElement = targetDoc.getElementById(`modal-input-${nextVar}`) || targetDoc.getElementById(`pip-input-${nextVar}`);
           if (nextElement) {
-            nextElement.focus();
+            (nextElement as HTMLElement).focus();
           }
         }, 50);
       } else {
@@ -802,6 +803,7 @@ export default function QuickFillModal({
                           value={values[varName] || ''}
                           rows={3}
                           onChange={(e) => handleInputChange(varName, e.target.value)}
+                          onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
                           className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs resize-y"
                         />
                       ) : (
@@ -826,6 +828,7 @@ export default function QuickFillModal({
                                 }
                               }
                             }}
+                            onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
                             className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs"
                           />
                         </div>
@@ -879,7 +882,9 @@ export default function QuickFillModal({
           right: '24px',
           zIndex: 100,
         }}
-        className="bg-black text-white hover:bg-neutral-900 border border-neutral-800 shadow-xl flex items-center gap-2 px-3.5 py-2 rounded-full cursor-grab active:cursor-grabbing pointer-events-auto select-none transition-all hover:scale-105"
+        className={`bg-black text-white hover:bg-neutral-900 border border-neutral-800 shadow-xl flex items-center gap-2 px-3.5 py-2 rounded-full cursor-grab active:cursor-grabbing pointer-events-auto select-none hover:scale-105 ${
+          isDragging ? 'transition-none' : 'transition-all duration-150'
+        }`}
         title="Arraste para mover. Clique para abrir."
       >
         <button
@@ -910,7 +915,9 @@ export default function QuickFillModal({
       id="quick-fill-modal-backdrop"
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
         isPipMode 
-          ? 'pointer-events-none bg-transparent' 
+          ? isDragging 
+            ? 'pointer-events-auto bg-transparent cursor-grabbing' 
+            : 'pointer-events-none bg-transparent' 
           : 'pointer-events-auto bg-black/45 backdrop-blur-xs'
       }`}
     >
@@ -932,7 +939,9 @@ export default function QuickFillModal({
               }
             : {}
         }
-        className={`bg-white border border-gray-200 shadow-2xl flex flex-col pointer-events-auto transition-all ${
+        className={`bg-white border border-gray-200 shadow-2xl flex flex-col pointer-events-auto ${
+          isDragging ? 'transition-none' : 'transition-all duration-150'
+        } ${
           isPipMode 
             ? 'rounded-2xl border-gray-300/90' 
             : 'max-w-4xl w-full rounded-xl overflow-hidden max-h-[85vh]'
