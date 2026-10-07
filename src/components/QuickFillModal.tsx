@@ -302,12 +302,20 @@ export function InteractiveDivInput({
     lastQueriedCepRef.current = cleanCep;
     
     setIsLoading(true);
+    const startTime = Date.now();
     try {
       const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
       if (!res.ok) {
         throw new Error('Falha na resposta da API');
       }
       const data = await res.json();
+      
+      // Calculate how much time passed, and enforce a minimum of 2 seconds (2000ms)
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 2000) {
+        await new Promise(resolve => setTimeout(resolve, 2000 - elapsed));
+      }
+
       if (data.erro === true || data.erro === 'true') {
         setErrorMessage('CEP não encontrado. Verifique o número digitado.');
         setIsLoading(false);
@@ -333,6 +341,11 @@ export function InteractiveDivInput({
       setSuccessMessage('✓ CEP consultado com sucesso!');
     } catch (err) {
       console.error(err);
+      // Wait for the remaining 2 seconds even on error
+      const elapsed = Date.now() - startTime;
+      if (elapsed < 2000) {
+        await new Promise(resolve => setTimeout(resolve, 2000 - elapsed));
+      }
       setErrorMessage('Erro de conexão ou consulta de CEP inválida.');
     } finally {
       setIsLoading(false);
@@ -379,7 +392,8 @@ export function InteractiveDivInput({
         }
       } else {
         const newVal = htmlToValue(ref.current);
-        onChange(newVal);
+        const cleanedVal = newVal.trim() === '' ? '' : newVal;
+        onChange(cleanedVal);
         if (errorMessage) {
           setErrorMessage(null);
         }
@@ -439,7 +453,7 @@ export function InteractiveDivInput({
         <div
           id={id}
           ref={ref}
-          contentEditable
+          contentEditable={!isLoading}
           suppressContentEditableWarning
           onInput={handleInput}
           onClick={handleClick}
@@ -457,8 +471,12 @@ export function InteractiveDivInput({
           style={{
             minHeight: '38px',
             outline: 'none',
+            WebkitUserSelect: 'text',
+            userSelect: 'text',
           }}
           className={`w-full bg-white border border-gray-200 focus:border-black focus:ring-1 focus:ring-black rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
+            isLoading ? 'bg-neutral-50/80 cursor-not-allowed opacity-70 select-none' : ''
+          } ${
             isCepVar ? 'pr-28' : ''
           } ${isMultiline ? 'min-h-[85px]' : ''}`}
         />
@@ -595,7 +613,7 @@ export default function QuickFillModal({
   const lastEnterPressRef = useRef<{ time: number; varName: string | null }>({ time: 0, varName: null });
 
   // Picture-in-Picture (PiP) and floating states
-  const [isPipMode, setIsPipMode] = useState(true);
+  const [isPipMode, setIsPipMode] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [pipTab, setPipTab] = useState<'fill' | 'preview'>('fill');
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -867,10 +885,10 @@ export default function QuickFillModal({
     const doSuccessActions = () => {
       setCopied(true);
       onCopy(template.id, textToCopy);
-      if (shouldClose) {
+      if (shouldClose && isPipMode) {
         setTimeout(() => {
           setCopied(false);
-          setIsMinimized(true); // Minimize to a floating button/pill instead of closing!
+          setIsMinimized(true); // Minimize to a floating button/pill in PiP mode
         }, 1000);
       } else {
         setTimeout(() => {
@@ -1177,7 +1195,7 @@ export default function QuickFillModal({
             <div className="flex-1 overflow-y-auto pr-1 space-y-4">
               {variables.length > 0 ? (
                 variables.map(varName => {
-                  const isFilled = !!values[varName];
+                  const isFilled = !!values[varName] && values[varName].trim() !== '';
                   const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
                   const presets = template?.variablePresets?.[varName] || [];
                   const isDate = isDateVariable(varName);
@@ -1330,8 +1348,6 @@ export default function QuickFillModal({
     >
       <div
         id="quick-fill-modal-content"
-        onMouseDown={isPipMode ? handleMouseDown : undefined}
-        onTouchStart={isPipMode ? handleTouchStart : undefined}
         style={
           isPipMode
             ? {
@@ -1356,6 +1372,8 @@ export default function QuickFillModal({
       >
         {/* Modal Header / PIP Drag handle */}
         <div 
+          onMouseDown={isPipMode ? handleMouseDown : undefined}
+          onTouchStart={isPipMode ? handleTouchStart : undefined}
           className={`px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3 bg-[#fafafa] select-none ${
             isPipMode ? 'cursor-grab active:cursor-grabbing rounded-t-2xl' : ''
           }`}
@@ -1577,7 +1595,7 @@ export default function QuickFillModal({
                   <div className="flex-1 overflow-y-auto pr-1 space-y-4">
                     {variables.length > 0 ? (
                       variables.map(varName => {
-                        const isFilled = !!values[varName];
+                        const isFilled = !!values[varName] && values[varName].trim() !== '';
                         const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
                         const presets = template?.variablePresets?.[varName] || [];
                         const isDate = isDateVariable(varName);
@@ -1821,7 +1839,7 @@ export default function QuickFillModal({
 
                       <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2">
                         {variables.map(varName => {
-                          const isFilled = !!values[varName];
+                          const isFilled = !!values[varName] && values[varName].trim() !== '';
                           const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
                           const presets = template?.variablePresets?.[varName] || [];
                           const isDate = isDateVariable(varName);
@@ -2031,7 +2049,6 @@ export default function QuickFillModal({
                               {/* Quick selection presets */}
                               {presets.length > 0 && (
                                 <div className="space-y-1 mt-1.5">
-                                  <span className="block text-[10px] text-gray-400 font-mono">Sugestões rápidas:</span>
                                   <div className="flex flex-wrap gap-1">
                                     {presets.map((preset, pIdx) => (
                                       <button
