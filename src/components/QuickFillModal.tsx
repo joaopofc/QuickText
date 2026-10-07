@@ -704,7 +704,14 @@ export default function QuickFillModal({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('textarea')) {
+    if (
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('select') || 
+      target.closest('textarea') ||
+      target.closest('[contenteditable="true"]') ||
+      target.closest('[contenteditable]')
+    ) {
       return;
     }
     
@@ -737,7 +744,14 @@ export default function QuickFillModal({
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('textarea')) {
+    if (
+      target.closest('button') || 
+      target.closest('input') || 
+      target.closest('select') || 
+      target.closest('textarea') ||
+      target.closest('[contenteditable="true"]') ||
+      target.closest('[contenteditable]')
+    ) {
       return;
     }
     
@@ -1058,7 +1072,7 @@ export default function QuickFillModal({
     }
 
     return (
-      <div className="bg-white text-gray-950 h-screen w-screen flex flex-col font-sans overflow-hidden select-none antialiased">
+      <div className="bg-white text-gray-950 h-screen w-screen flex flex-col font-sans overflow-hidden antialiased">
         {/* Header */}
         <div className="px-4 py-3 bg-[#fcfcfd] border-b border-gray-100 flex items-center justify-between gap-2 shrink-0">
           <div className="min-w-0 flex-1">
