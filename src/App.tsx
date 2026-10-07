@@ -278,9 +278,9 @@ export default function App() {
           
           {/* Logo Brand */}
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-bold bg-black text-white px-1.5 py-0.5 rounded-sm tracking-wider">QT</span>
+            <span className="font-mono text-xs font-bold bg-black text-white px-1.5 py-0.5 rounded-sm tracking-wider">TP</span>
             <h1 className="font-sans font-bold text-gray-900 text-sm tracking-tight">
-              QuickText <span className="font-normal text-gray-400">| Textos Padronizados</span>
+              Texto Padrão <span className="font-normal text-gray-400">| Textos Padronizados</span>
             </h1>
           </div>
 
@@ -525,7 +525,7 @@ export default function App() {
       <footer id="app-main-footer" className="border-t border-gray-100 py-6 px-6 mt-16 bg-white text-center text-xs text-gray-400">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 font-mono">
           <p>
-            QuickText &copy; 2026 &mdash; Tudo localmente
+            Texto Padrão &copy; 2026 &mdash; Tudo localmente
           </p>
           <div className="text-[10px] text-gray-400 flex items-center justify-center sm:justify-end gap-3.5">
             <button

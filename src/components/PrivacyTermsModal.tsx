@@ -43,7 +43,7 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
               Garantia de Confidencialidade e Segurança
             </p>
             <h3 className="text-base font-bold text-gray-900 tracking-tight">
-              Por que usar o QuickText é 100% seguro para os dados de seus clientes?
+              Por que usar o Texto Padrão é 100% seguro para os dados de seus clientes?
             </h3>
             <p>
               Entendemos que textos de suporte, ouvidoria e cobrança frequentemente lidam com dados sensíveis de clientes (nomes, CPFs, e-mails, protocolos e valores). Por isso, esta plataforma foi projetada seguindo o princípio de <strong>Privacidade por Design (Privacy by Design)</strong>.
@@ -143,7 +143,7 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
                   6. Segurança de Área de Transferência (Clipboard)
                 </h5>
                 <p className="text-xs text-gray-500">
-                  Ao clicar em "Copiar" ou concluir o preenchimento, os dados são enviados diretamente para a área de transferência do seu sistema operacional. Nenhum software malicioso ou script secundário intercepta o conteúdo gerado por meio do QuickText.
+                  Ao clicar em "Copiar" ou concluir o preenchimento, os dados são enviados diretamente para a área de transferência do seu sistema operacional. Nenhum software malicioso ou script secundário intercepta o conteúdo gerado por meio do Texto Padrão.
                 </p>
               </div>
             </div>
@@ -155,7 +155,7 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
           <div className="bg-neutral-50 p-4 rounded-lg border border-gray-100 text-[11px] text-gray-500 space-y-1.5 font-mono">
             <p className="font-bold text-gray-700">TERMO DE RESPONSABILIDADE:</p>
             <p>
-              O QuickText é uma ferramenta de produtividade estritamente local. Certifique-se de colar as informações copiadas de forma segura e nos canais oficiais apropriados definidos pela sua organização.
+              O Texto Padrão é uma ferramenta de produtividade estritamente local. Certifique-se de colar as informações copiadas de forma segura e nos canais oficiais apropriados definidos pela sua organização.
             </p>
           </div>
         </div>
