@@ -51,6 +51,46 @@ export default function App() {
     }
   }, []);
 
+  // Global Keyboard Shortcuts (Esc & Ctrl/Cmd + N)
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      // Shortcut: Esc to close any open modal safely
+      if (e.key === 'Escape') {
+        const accepted = localStorage.getItem('quick_text_privacy_accepted') === 'true';
+        if (accepted) {
+          setIsFormOpen(false);
+          setActiveQuickFill(null);
+          setIsPrivacyOpen(false);
+          setIsSettingsOpen(false);
+          setIsPositionEditorOpen(false);
+          setDeleteConfirmId(null);
+          setIsResetConfirmOpen(false);
+        }
+        return;
+      }
+
+      // Shortcut: Ctrl + N / Cmd + N to trigger New Template Form
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'n') {
+        const accepted = localStorage.getItem('quick_text_privacy_accepted') === 'true';
+        if (accepted) {
+          e.preventDefault(); // Prevents Chrome from opening a new window
+          setEditingTemplate(null);
+          setIsFormOpen(true);
+          
+          // Smooth scroll to form container after render
+          setTimeout(() => {
+            document.getElementById('active-template-form-container')?.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => {
+      window.removeEventListener('keydown', handleGlobalShortcuts);
+    };
+  }, []);
+
   const handleAcceptPrivacy = () => {
     localStorage.setItem('quick_text_privacy_accepted', 'true');
     setHasAcceptedPrivacy(true);
