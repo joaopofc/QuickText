@@ -625,11 +625,27 @@ export default function QuickFillModal({
   const [showNativePipButton, setShowNativePipButton] = useState(true);
 
   // Font size state for text preview
-  const [previewFontSize, setPreviewFontSize] = useState(13);
-  const [previewFontFamily, setPreviewFontFamily] = useState<'sans' | 'poppins' | 'lexend' | 'outfit' | 'cascadia'>('sans');
+  const [previewFontSize, setPreviewFontSize] = useState(() => {
+    const saved = localStorage.getItem('quick_text_preview_font_size');
+    return saved ? parseInt(saved, 10) : 13;
+  });
+  const [previewFontFamily, setPreviewFontFamily] = useState<'sans' | 'poppins' | 'lexend' | 'outfit' | 'cascadia'>(() => {
+    const saved = localStorage.getItem('quick_text_preview_font_family');
+    return (saved as any) || 'sans';
+  });
   const [showFontToolbar, setShowFontToolbar] = useState(false);
+  const [showPipFontToolbar, setShowPipFontToolbar] = useState(false);
+  
   const handleIncreaseFont = () => setPreviewFontSize(prev => Math.min(24, prev + 1));
   const handleDecreaseFont = () => setPreviewFontSize(prev => Math.max(10, prev - 1));
+
+  useEffect(() => {
+    localStorage.setItem('quick_text_preview_font_family', previewFontFamily);
+  }, [previewFontFamily]);
+
+  useEffect(() => {
+    localStorage.setItem('quick_text_preview_font_size', previewFontSize.toString());
+  }, [previewFontSize]);
 
   const fontStyles: Record<string, string> = {
     sans: '"Inter", sans-serif',
@@ -686,6 +702,13 @@ export default function QuickFillModal({
         width: 480,
         height: 620,
       });
+
+      // Set custom title to avoid domain name showing
+      try {
+        pipWin.document.title = "Texto Padrão (QuickText)";
+      } catch (e) {
+        console.warn("Could not set Picture-in-Picture window title:", e);
+      }
 
       // Copy page stylesheets to style the new PiP window perfectly
       [...document.styleSheets].forEach((styleSheet) => {
@@ -900,7 +923,7 @@ export default function QuickFillModal({
     const doSuccessActions = () => {
       setCopied(true);
       onCopy(template.id, textToCopy);
-      if (shouldClose && isPipMode) {
+      if (isPipMode || externalPipWindow) {
         setTimeout(() => {
           setCopied(false);
           setIsMinimized(true); // Minimize to a floating button/pill in PiP mode
@@ -993,11 +1016,7 @@ export default function QuickFillModal({
           }
         }, 50);
       } else {
-        if (isDoublePress) {
-          performCopy(nextValues, true);
-        } else {
-          performCopy(nextValues, false);
-        }
+        performCopy(nextValues, true);
       }
     }
   };
@@ -1073,7 +1092,7 @@ export default function QuickFillModal({
           );
         }
       }
-      return <span key={index} className="font-semibold text-gray-800">{part}</span>;
+      return <span key={index} className="font-normal text-gray-600">{part}</span>;
     });
   };
 
@@ -1309,8 +1328,69 @@ export default function QuickFillModal({
             </div>
           ) : (
             <div className="flex-1 flex flex-col min-h-0 bg-white">
-              <div className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-4 font-sans text-xs text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto shadow-inner select-text">
+              <div 
+                style={{ fontSize: `${previewFontSize}px`, fontFamily: fontStyles[previewFontFamily] }}
+                className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-4 font-sans text-xs text-gray-600 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto shadow-inner relative select-text"
+              >
                 {renderLivePreview()}
+              </div>
+              
+              {/* Font family and size adjustment buttons for External PiP */}
+              <div className="flex items-center justify-between gap-1 mt-2 bg-gray-50 border border-gray-100 rounded-lg p-1.5 shrink-0 relative">
+                <div className="flex items-center gap-1 relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowPipFontToolbar(prev => !prev)}
+                    className="px-2 py-1 text-[9px] font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-md shadow-3xs flex items-center gap-1 transition-all cursor-pointer"
+                  >
+                    <Type size={10} className="text-gray-400" />
+                    <span>Fonte: <span className="font-semibold text-black" style={{ fontFamily: fontStyles[previewFontFamily] }}>{previewFontFamily === 'sans' ? 'Inter' : previewFontFamily === 'cascadia' ? 'Cascadia' : previewFontFamily === 'outfit' ? 'Outfit' : previewFontFamily.charAt(0).toUpperCase() + previewFontFamily.slice(1)}</span></span>
+                    <ChevronDown size={8} className={`text-gray-400 transition-transform ${showPipFontToolbar ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {/* Floating Popover Font Toolbar for External PiP */}
+                  {showPipFontToolbar && (
+                    <div className="absolute bottom-full mb-1 left-0 z-50 p-1 bg-white border border-gray-200 rounded-lg shadow-md flex items-center gap-0.5 animate-in slide-in-from-bottom-1 duration-150">
+                      {(['sans', 'poppins', 'lexend', 'outfit', 'cascadia'] as const).map((font) => (
+                        <button
+                          key={font}
+                          type="button"
+                          onClick={() => {
+                            setPreviewFontFamily(font);
+                            setShowPipFontToolbar(false);
+                          }}
+                          className={`px-1.5 py-1 text-[8px] font-semibold rounded transition-all cursor-pointer whitespace-nowrap ${
+                            previewFontFamily === font
+                              ? 'bg-neutral-900 text-white shadow-3xs'
+                              : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                          }`}
+                          style={{ fontFamily: fontStyles[font] }}
+                        >
+                          {font === 'sans' ? 'Inter' : font === 'cascadia' ? 'Cascadia' : font === 'outfit' ? 'Outfit' : font.charAt(0).toUpperCase() + font.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center bg-gray-200/60 rounded-md p-0.5">
+                  <button
+                    type="button"
+                    onClick={handleDecreaseFont}
+                    className="px-1.5 py-0.5 text-[9px] font-bold text-gray-600 hover:text-black hover:bg-white rounded transition-all cursor-pointer"
+                  >
+                    -
+                  </button>
+                  <span className="px-1 text-[9px] font-bold font-mono text-gray-700 min-w-[20px] text-center">
+                    {previewFontSize}px
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleIncreaseFont}
+                    className="px-1.5 py-0.5 text-[9px] font-bold text-gray-600 hover:text-black hover:bg-white rounded transition-all cursor-pointer"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -1360,11 +1440,22 @@ export default function QuickFillModal({
     );
   }
 
+  if (externalPipWindow && isMinimized) {
+    return (
+      <div style={{ display: 'none' }} className="hidden">
+        {createPortal(
+          renderPipContent(),
+          externalPipWindow.document.body
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       id="quick-fill-modal-backdrop"
       className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-all duration-300 ${
-        isPipMode 
+        (isPipMode || externalPipWindow) 
           ? isDragging 
             ? 'pointer-events-auto bg-transparent cursor-grabbing' 
             : 'pointer-events-none bg-transparent' 
@@ -1835,27 +1926,47 @@ export default function QuickFillModal({
                   <div className="flex-1 flex flex-col min-h-0">
                     <div 
                       style={{ fontSize: `${previewFontSize}px`, fontFamily: fontStyles[previewFontFamily] }}
-                      className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-4 text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto shadow-inner relative select-text"
+                      className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-4 text-gray-600 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto shadow-inner relative select-text"
                     >
                       {renderLivePreview()}
                     </div>
                     
                     {/* Font family and size adjustment buttons for PiP */}
-                    <div className="flex items-center justify-between gap-1 mt-2 bg-gray-50 border border-gray-100 rounded-lg p-1.5">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[9px] text-gray-400 font-mono">Fonte:</span>
-                        <select
-                          value={previewFontFamily}
-                          onChange={(e) => setPreviewFontFamily(e.target.value as any)}
-                          className="bg-white border border-gray-200 rounded px-1 py-0.5 text-[9px] font-semibold text-gray-700 outline-none cursor-pointer"
-                          style={{ fontFamily: fontStyles[previewFontFamily] }}
+                    <div className="flex items-center justify-between gap-1 mt-2 bg-gray-50 border border-gray-100 rounded-lg p-1.5 shrink-0 relative">
+                      <div className="flex items-center gap-1 relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowPipFontToolbar(prev => !prev)}
+                          className="px-2 py-1 text-[9px] font-bold text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-md shadow-3xs flex items-center gap-1 transition-all cursor-pointer"
                         >
-                          <option value="sans">Inter</option>
-                          <option value="poppins">Poppins</option>
-                          <option value="lexend">Lexend</option>
-                          <option value="outfit">Outfit</option>
-                          <option value="cascadia">Cascadia</option>
-                        </select>
+                          <Type size={10} className="text-gray-400" />
+                          <span>Fonte: <span className="font-semibold text-black" style={{ fontFamily: fontStyles[previewFontFamily] }}>{previewFontFamily === 'sans' ? 'Inter' : previewFontFamily === 'cascadia' ? 'Cascadia' : previewFontFamily === 'outfit' ? 'Outfit' : previewFontFamily.charAt(0).toUpperCase() + previewFontFamily.slice(1)}</span></span>
+                          <ChevronDown size={8} className={`text-gray-400 transition-transform ${showPipFontToolbar ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {/* Floating Popover Font Toolbar for PiP */}
+                        {showPipFontToolbar && (
+                          <div className="absolute bottom-full mb-1 left-0 z-50 p-1 bg-white border border-gray-200 rounded-lg shadow-md flex items-center gap-0.5 animate-in slide-in-from-bottom-1 duration-150">
+                            {(['sans', 'poppins', 'lexend', 'outfit', 'cascadia'] as const).map((font) => (
+                              <button
+                                key={font}
+                                type="button"
+                                onClick={() => {
+                                  setPreviewFontFamily(font);
+                                  setShowPipFontToolbar(false);
+                                }}
+                                className={`px-1.5 py-1 text-[8px] font-semibold rounded transition-all cursor-pointer whitespace-nowrap ${
+                                  previewFontFamily === font
+                                    ? 'bg-neutral-900 text-white shadow-3xs'
+                                    : 'text-gray-600 hover:text-black hover:bg-gray-100'
+                                }`}
+                                style={{ fontFamily: fontStyles[font] }}
+                              >
+                                {font === 'sans' ? 'Inter' : font === 'cascadia' ? 'Cascadia' : font === 'outfit' ? 'Outfit' : font.charAt(0).toUpperCase() + font.slice(1)}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center bg-gray-200/60 rounded-md p-0.5">
                         <button
@@ -2183,7 +2294,7 @@ export default function QuickFillModal({
 
                     <div 
                       style={{ fontSize: `${previewFontSize}px`, fontFamily: fontStyles[previewFontFamily] }}
-                      className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-5 text-gray-800 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto max-h-[50vh] min-h-[250px] shadow-inner relative select-text"
+                      className="bg-[#fcfcfd] border border-gray-200 rounded-xl p-5 text-gray-600 whitespace-pre-wrap leading-relaxed flex-1 overflow-y-auto max-h-[50vh] min-h-[250px] shadow-inner relative select-text"
                     >
                       {renderLivePreview()}
                     </div>
@@ -2265,7 +2376,7 @@ export default function QuickFillModal({
                   </div>
                   <div 
                     style={{ fontSize: `${previewFontSize}px`, fontFamily: fontStyles[previewFontFamily] }}
-                    className="bg-[#fcfcfd] p-5 rounded-xl border border-gray-200 text-gray-800 whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto shadow-inner select-text"
+                    className="bg-[#fcfcfd] p-5 rounded-xl border border-gray-200 text-gray-600 whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto shadow-inner select-text"
                   >
                     {template.content}
                   </div>

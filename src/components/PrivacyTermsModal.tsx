@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Shield, Lock, EyeOff, Database, CheckCircle, Scale, Zap, Github } from 'lucide-react';
+import { X, Shield, Lock, EyeOff, Database, CheckCircle, Scale, Zap, Github, Briefcase, Building2, Share2 } from 'lucide-react';
 
 interface PrivacyTermsModalProps {
   isOpen: boolean;
@@ -163,6 +163,51 @@ export default function PrivacyTermsModal({ isOpen, onClose, onAccept, isForced 
                 </h5>
                 <p className="text-xs text-gray-500">
                   Para máxima transparência de conformidade e segurança da informação, todo o código-fonte deste projeto é aberto e está disponível publicamente para auditoria técnica no GitHub oficial: <a href="https://github.com/joaopofc/QuickText" target="_blank" rel="noopener noreferrer" className="text-black font-semibold hover:underline">https://github.com/joaopofc/QuickText.git</a>. Você ou a equipe de TI da sua empresa podem auditar o repositório para verificar a integridade da plataforma e certificar que todo o processamento de dados é 100% estrito ao lado do cliente (client-side).
+                </p>
+              </div>
+            </div>
+
+            {/* Clause 8 */}
+            <div className="flex gap-3.5 items-start">
+              <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600 shrink-0 border border-blue-100 mt-0.5">
+                <Briefcase size={16} />
+              </div>
+              <div className="space-y-1">
+                <h5 className="font-semibold text-gray-900 text-xs">
+                  8. Uso Individual pelo Colaborador (No Âmbito Corporativo)
+                </h5>
+                <p className="text-xs text-gray-500">
+                  O colaborador/operador tem total permissão para utilizar o Texto Padrão individualmente para aumentar a velocidade de suas rotinas de atendimento diário. O usuário é o único responsável pelo preenchimento correto das variáveis e por garantir que o texto final gerado respeite as políticas de tom de voz, confidencialidade de dados e regras internas definidas por sua empresa. Como o processamento ocorre 100% no navegador, o colaborador retém a custódia local de seus modelos criados.
+                </p>
+              </div>
+            </div>
+
+            {/* Clause 9 */}
+            <div className="flex gap-3.5 items-start">
+              <div className="p-1.5 bg-purple-50 rounded-lg text-purple-600 shrink-0 border border-purple-100 mt-0.5">
+                <Building2 size={16} />
+              </div>
+              <div className="space-y-1">
+                <h5 className="font-semibold text-gray-900 text-xs">
+                  9. Uso, Recomendação e Distribuição Institucional pela Empresa (Para Equipes)
+                </h5>
+                <p className="text-xs text-gray-500">
+                  Empresas, departamentos ou gerências de atendimento têm permissão para recomendar, homologar e adotar o Texto Padrão oficialmente como ferramenta corporativa para suas equipes. A organização tem total autonomia para utilizar a funcionalidade de backup (Importar/Exportar) para padronizar e distribuir coleções oficiais de respostas prontas para seus atendentes, garantindo consistência na qualidade operacional. A empresa reconhece que a ferramenta opera de forma local e offline, responsabilizando-se pelo teor das respostas padronizadas criadas e distribuídas internamente para seus times.
+                </p>
+              </div>
+            </div>
+
+            {/* Clause 10 */}
+            <div className="flex gap-3.5 items-start">
+              <div className="p-1.5 bg-sky-50 rounded-lg text-sky-600 shrink-0 border border-sky-100 mt-0.5">
+                <Share2 size={16} />
+              </div>
+              <div className="space-y-1">
+                <h5 className="font-semibold text-gray-900 text-xs">
+                  10. Compartilhamento, Importação e Exportação de Modelos (Base64)
+                </h5>
+                <p className="text-xs text-gray-500">
+                  A plataforma oferece suporte nativo para o compartilhamento offline e seguro de bibliotecas de modelos de texto. O usuário pode exportar seus dados na forma de uma Chave de Sincronização codificada em Base64 para compartilhar livremente via canais internos corporativos (Slack, E-mail, Teams). Ao importar um código de backup, é possível escolher entre o modo de mesclagem (importando novos itens sem duplicar os existentes) ou de substituição total (sobrescrevendo o banco local). Toda a codificação e decodificação ocorre em tempo de execução estritamente local no navegador do usuário, impossibilitando o rastreio ou armazenamento externo dos modelos compartilhados.
                 </p>
               </div>
             </div>
