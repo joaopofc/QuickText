@@ -19,6 +19,7 @@ export default function App() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [activeQuickFill, setActiveQuickFill] = useState<Template | null>(null);
   const [globalCopiedAlert, setGlobalCopiedAlert] = useState<string | null>(null);
+  const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState<boolean>(true); // true initially to avoid flicker, corrected on mount
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPositionEditorOpen, setIsPositionEditorOpen] = useState(false);
@@ -29,6 +30,13 @@ export default function App() {
 
   // Load from localStorage on mount
   useEffect(() => {
+    // Check if privacy terms have been accepted
+    const accepted = localStorage.getItem('quick_text_privacy_accepted') === 'true';
+    setHasAcceptedPrivacy(accepted);
+    if (!accepted) {
+      setIsPrivacyOpen(true);
+    }
+
     const stored = localStorage.getItem('quick_text_templates');
     if (stored) {
       try {
@@ -42,6 +50,12 @@ export default function App() {
       localStorage.setItem('quick_text_templates', JSON.stringify(DEFAULT_TEMPLATES));
     }
   }, []);
+
+  const handleAcceptPrivacy = () => {
+    localStorage.setItem('quick_text_privacy_accepted', 'true');
+    setHasAcceptedPrivacy(true);
+    setIsPrivacyOpen(false);
+  };
 
   // Save to localStorage whenever templates change
   const saveTemplates = (updated: Template[]) => {
@@ -497,8 +511,27 @@ export default function App() {
 
       <PrivacyTermsModal
         isOpen={isPrivacyOpen}
-        onClose={() => setIsPrivacyOpen(false)}
+        isForced={!hasAcceptedPrivacy}
+        onAccept={handleAcceptPrivacy}
+        onClose={() => {
+          if (hasAcceptedPrivacy) {
+            setIsPrivacyOpen(false);
+          }
+        }}
       />
+
+      {/* Blocking Blur Overlay when privacy is not accepted */}
+      {!hasAcceptedPrivacy && (
+        <div className="fixed inset-0 bg-neutral-100/50 backdrop-blur-md z-45 flex flex-col items-center justify-center p-4 select-none">
+          <div className="bg-white/80 border border-gray-200/80 rounded-2xl p-6 max-w-sm text-center space-y-3.5 shadow-xl">
+            <span className="font-mono text-xs font-bold bg-black text-white px-2 py-0.5 rounded-sm tracking-wider">TP</span>
+            <h3 className="text-gray-900 font-bold text-sm tracking-tight">Aceite Requerido</h3>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Para garantir a conformidade com a LGPD/GDPR e a segurança total de dados, é obrigatório aceitar os Termos de Uso e Privacidade antes de iniciar.
+            </p>
+          </div>
+        </div>
+      )}
 
       <SettingsModal
         isOpen={isSettingsOpen}

@@ -1,12 +1,14 @@
 import React from 'react';
-import { X, Shield, Lock, EyeOff, Database, CheckCircle, Scale, Zap } from 'lucide-react';
+import { X, Shield, Lock, EyeOff, Database, CheckCircle, Scale, Zap, Github } from 'lucide-react';
 
 interface PrivacyTermsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onAccept?: () => void;
+  isForced?: boolean;
 }
 
-export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModalProps) {
+export default function PrivacyTermsModal({ isOpen, onClose, onAccept, isForced = false }: PrivacyTermsModalProps) {
   if (!isOpen) return null;
 
   return (
@@ -26,14 +28,16 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
               Termos de Uso & Privacidade de Dados
             </h2>
           </div>
-          <button
-            id="privacy-close-btn"
-            onClick={onClose}
-            className="text-gray-400 hover:text-black transition-colors p-1 rounded-md hover:bg-gray-100"
-            title="Fechar"
-          >
-            <X size={16} />
-          </button>
+          {!isForced && (
+            <button
+              id="privacy-close-btn"
+              onClick={onClose}
+              className="text-gray-400 hover:text-black transition-colors p-1 rounded-md hover:bg-gray-100"
+              title="Fechar"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
@@ -46,7 +50,7 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
               Por que usar o Texto Padrão é 100% seguro para os dados de seus clientes?
             </h3>
             <p>
-              Entendemos que textos de suporte, ouvidoria e cobrança frequentemente lidam com dados sensíveis de clientes (nomes, CPFs, e-mails, protocolos e valores). Por isso, esta plataforma foi projetada seguindo o princípio de <strong>Privacidade por Design (Privacy by Design)</strong>.
+              Entendemos que textos de suporte, ouvidoria e cobrança frequentemente lidam com dados sensíveis de clientes (nomes, CPFs, e-mails, protocolos e valores). Por isso, esta plataforma foi projetada seguindo o princípio de <strong>Privacidade por Design (Privacy by Design)</strong>. A única e exclusiva requisição externa realizada por este sistema ocorre para a consulta automática de CEP, sem enviar absolutamente nenhuma outra informação.
             </p>
           </div>
 
@@ -95,10 +99,10 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
               </div>
               <div className="space-y-1">
                 <h5 className="font-semibold text-gray-900 text-xs">
-                  3. Processamento de Variáveis Sem Rastreamento
+                  3. Única e Exclusiva Consulta de API: Busca de CEP
                 </h5>
                 <p className="text-xs text-gray-500">
-                  O preenchimento dinâmico das variáveis de texto (tanto as de preenchimento simples <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono text-[10px]">{"{{campo}}"}</code> quanto as de caixa grande <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded font-mono text-[10px]">{"[[campo]]"}</code>) ocorre de forma puramente computacional na memória de execução da aplicação. Não existe registro (log), telemetria ou histórico de digitação de valores.
+                  A única e exclusiva consulta externa realizada pela plataforma ocorre para buscar informações de endereço a partir de um CEP digitado na variável "cep" (utilizando a API pública e segura do ViaCEP). Nenhuma informação do cliente, textos editados ou quaisquer outros dados digitados são transmitidos nessa ou em qualquer outra consulta. Todo o restante ocorre de forma 100% isolada e local na memória do seu navegador.
                 </p>
               </div>
             </div>
@@ -147,6 +151,21 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
                 </p>
               </div>
             </div>
+
+            {/* Clause 7 */}
+            <div className="flex gap-3.5 items-start">
+              <div className="p-1.5 bg-neutral-100 rounded-lg text-neutral-800 shrink-0 border border-neutral-200 mt-0.5">
+                <Github size={16} />
+              </div>
+              <div className="space-y-1">
+                <h5 className="font-semibold text-gray-900 text-xs">
+                  7. Código Aberto, Transparência e Auditoria (GitHub)
+                </h5>
+                <p className="text-xs text-gray-500">
+                  Para máxima transparência de conformidade e segurança da informação, todo o código-fonte deste projeto é aberto e está disponível publicamente para auditoria técnica no GitHub oficial: <a href="https://github.com/joaopofc/QuickText" target="_blank" rel="noopener noreferrer" className="text-black font-semibold hover:underline">https://github.com/joaopofc/QuickText.git</a>. Você ou a equipe de TI da sua empresa podem auditar o repositório para verificar a integridade da plataforma e certificar que todo o processamento de dados é 100% estrito ao lado do cliente (client-side).
+                </p>
+              </div>
+            </div>
           </div>
 
           <hr className="border-gray-100" />
@@ -164,10 +183,10 @@ export default function PrivacyTermsModal({ isOpen, onClose }: PrivacyTermsModal
         <div className="px-6 py-4 bg-neutral-50 flex items-center justify-end gap-3 shrink-0 border-t border-gray-100">
           <button
             id="privacy-accept-btn"
-            onClick={onClose}
-            className="px-4 py-2 bg-black hover:bg-neutral-800 text-white font-sans text-xs font-bold rounded-md transition-colors shadow-2xs"
+            onClick={isForced && onAccept ? onAccept : onClose}
+            className="px-4 py-2 bg-black hover:bg-neutral-800 text-white font-sans text-xs font-bold rounded-md transition-colors shadow-2xs cursor-pointer"
           >
-            Entendido e De Acordo
+            {isForced ? 'Aceitar e Continuar' : 'Entendido e De Acordo'}
           </button>
         </div>
       </div>
