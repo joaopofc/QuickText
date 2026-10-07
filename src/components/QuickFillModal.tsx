@@ -213,6 +213,7 @@ export function parseSegments(value: string): Segment[] {
 
 interface InteractiveDivInputProps {
   id: string;
+  varName?: string;
   value: string;
   onChange: (val: string) => void;
   placeholder: string;
@@ -265,6 +266,7 @@ function htmlToValue(element: HTMLDivElement): string {
 
 export function InteractiveDivInput({
   id,
+  varName,
   value,
   onChange,
   placeholder,
@@ -274,8 +276,15 @@ export function InteractiveDivInput({
   onFocus,
 }: InteractiveDivInputProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const lastQueriedCepRef = useRef<string>('');
   const [activeDropdownVar, setActiveDropdownVar] = useState<{ name: string; element: HTMLElement } | null>(null);
   const [customInputValue, setCustomInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const isCepVar = varName?.toLowerCase().trim() === 'cep';
+  const isAlreadyFilled = value.toLowerCase().includes('cep:') || value.includes('[XXX]') || value.includes(' - ');
 
   // Sync internal HTML with external value ONLY if it represents different text
   useEffect(() => {
@@ -287,10 +296,97 @@ export function InteractiveDivInput({
     }
   }, [value]);
 
+  const triggerCepLookup = async (cleanCep: string) => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    lastQueriedCepRef.current = cleanCep;
+    
+    setIsLoading(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      if (!res.ok) {
+        throw new Error('Falha na resposta da API');
+      }
+      const data = await res.json();
+      if (data.erro === true || data.erro === 'true') {
+        setErrorMessage('CEP não encontrado. Verifique o número digitado.');
+        setIsLoading(false);
+        return;
+      }
+      
+      const logradouro = data.logradouro || '';
+      const bairro = data.bairro || '';
+      const localidade = data.localidade || '';
+      const uf = data.uf || '';
+      const regiao = data.regiao || '';
+      const ddd = data.ddd || '';
+      
+      // Template: CEP: 44444444 - Rua Via Coletora B [XXX], Nossa Senhora das Graças, Santo Antônio de Jesus BA / Nordeste DDD (75)
+      const regiaoText = regiao ? ` / ${regiao}` : '';
+      const dddText = ddd ? ` DDD (${ddd})` : '';
+      const filledText = `CEP: ${cleanCep} - ${logradouro} [XXX], ${bairro}, ${localidade} ${uf}${regiaoText}${dddText}`;
+      
+      onChange(filledText);
+      if (ref.current) {
+        ref.current.innerHTML = valueToHtml(filledText);
+      }
+      setSuccessMessage('✓ CEP consultado com sucesso!');
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('Erro de conexão ou consulta de CEP inválida.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleInput = () => {
     if (ref.current) {
-      const newVal = htmlToValue(ref.current);
-      onChange(newVal);
+      let rawVal = htmlToValue(ref.current);
+      
+      if (isCepVar && !isAlreadyFilled) {
+        // Clean: keep only digits
+        const clean = rawVal.replace(/\D/g, '');
+        const clean8 = clean.slice(0, 8);
+        
+        // Format as XXXXX-XXX
+        let formatted = clean8;
+        if (clean8.length > 5) {
+          formatted = `${clean8.slice(0, 5)}-${clean8.slice(5)}`;
+        }
+        
+        // Only update innerText if it represents a structural change to avoid cursor resetting
+        if (rawVal !== formatted) {
+          ref.current.innerText = formatted;
+          // Position cursor at the very end
+          const range = document.createRange();
+          const sel = window.getSelection();
+          range.selectNodeContents(ref.current);
+          range.collapse(false);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        }
+        
+        onChange(formatted);
+        
+        if (errorMessage) setErrorMessage(null);
+        if (successMessage) setSuccessMessage(null);
+
+        // Auto trigger search if exactly 8 digits are supplied
+        if (clean8.length === 8 && lastQueriedCepRef.current !== clean8) {
+          triggerCepLookup(clean8);
+        } else if (clean8.length < 8) {
+          lastQueriedCepRef.current = '';
+        }
+      } else {
+        const newVal = htmlToValue(ref.current);
+        onChange(newVal);
+        if (errorMessage) {
+          setErrorMessage(null);
+        }
+        if (successMessage) {
+          setSuccessMessage(null);
+        }
+      }
     }
   };
 
@@ -338,37 +434,68 @@ export function InteractiveDivInput({
   const presets = activeDropdownVar ? variablePresets[activeDropdownVar.name] || [] : [];
 
   return (
-    <div className="relative w-full">
-      <div
-        id={id}
-        ref={ref}
-        contentEditable
-        suppressContentEditableWarning
-        onInput={handleInput}
-        onClick={handleClick}
-        onFocus={onFocus}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            if (!isMultiline) {
-              e.preventDefault();
-              if (onKeyDown) {
-                onKeyDown(e);
+    <div className="relative w-full flex flex-col gap-1.5">
+      <div className="relative flex items-center">
+        <div
+          id={id}
+          ref={ref}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={handleInput}
+          onClick={handleClick}
+          onFocus={onFocus}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              if (!isMultiline) {
+                e.preventDefault();
+                if (onKeyDown) {
+                  onKeyDown(e);
+                }
               }
             }
-          }
-        }}
-        style={{
-          minHeight: '38px',
-          outline: 'none',
-        }}
-        className={`w-full bg-white border border-gray-200 focus:border-black focus:ring-1 focus:ring-black rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
-          isMultiline ? 'min-h-[85px]' : ''
-        }`}
-      />
-      
-      {!value && (
-        <div className="absolute top-2.5 left-3.5 text-gray-400 text-xs font-sans pointer-events-none select-none">
-          {placeholder}
+          }}
+          style={{
+            minHeight: '38px',
+            outline: 'none',
+          }}
+          className={`w-full bg-white border border-gray-200 focus:border-black focus:ring-1 focus:ring-black rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
+            isCepVar ? 'pr-28' : ''
+          } ${isMultiline ? 'min-h-[85px]' : ''}`}
+        />
+        
+        {isCepVar && (
+          <div className="absolute right-3.5 flex items-center gap-1.5 pointer-events-none select-none z-10">
+            {isLoading && (
+              <div className="flex items-center gap-1 text-[10px] text-neutral-400 font-sans">
+                <RefreshCw size={10} className="animate-spin text-gray-400" />
+                <span>Buscando...</span>
+              </div>
+            )}
+            {successMessage && !isLoading && (
+              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-sans font-semibold">
+                <Check size={11} className="text-emerald-500" />
+                <span>Pronto!</span>
+              </div>
+            )}
+          </div>
+        )}
+        
+        {!value && (
+          <div className="absolute top-2.5 left-3.5 text-gray-400 text-xs font-sans pointer-events-none select-none">
+            {placeholder}
+          </div>
+        )}
+      </div>
+
+      {errorMessage && (
+        <div className="text-[10px] text-red-500 font-sans font-medium px-1 flex items-center gap-1 animate-in fade-in duration-150">
+          <span>⚠️ {errorMessage}</span>
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="text-[10px] text-emerald-600 font-sans font-semibold px-1 flex items-center gap-1 animate-in fade-in duration-150">
+          <span>{successMessage}</span>
         </div>
       )}
       
@@ -1090,6 +1217,7 @@ export default function QuickFillModal({
                       ) : (
                         <InteractiveDivInput
                           id={`pip-input-${varName}`}
+                          varName={varName}
                           value={values[varName] || ''}
                           onChange={(val) => handleInputChange(varName, val)}
                           placeholder={`Inserir valor para ${varName}...`}
@@ -1612,6 +1740,7 @@ export default function QuickFillModal({
                             ) : (
                               <InteractiveDivInput
                                 id={`modal-input-${varName}`}
+                                varName={varName}
                                 value={values[varName] || ''}
                                 onChange={(val) => handleInputChange(varName, val)}
                                 placeholder={`Inserir valor para ${varName}...`}
@@ -1875,6 +2004,7 @@ export default function QuickFillModal({
                               ) : (
                                 <InteractiveDivInput
                                   id={`modal-input-${varName}`}
+                                  varName={varName}
                                   value={values[varName] || ''}
                                   onChange={(val) => handleInputChange(varName, val)}
                                   placeholder={`Inserir valor para ${varName}...`}
