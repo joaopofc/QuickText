@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers, ExternalLink, ChevronDown } from 'lucide-react';
+import { X, Copy, Check, Sliders, Eye, RefreshCw, Calendar, ChevronLeft, ChevronRight, Maximize2, Minimize2, Move, Layers, ExternalLink, ChevronDown, Plus } from 'lucide-react';
 import { Template } from '../types';
 import { extractVariables, replaceVariables, isMultilineVariable } from '../utils/templateHelpers';
 
@@ -175,6 +175,274 @@ const getYearOptions = (currentYear: number) => {
   return Array.from(years).sort((a, b) => a - b);
 };
 
+export interface Segment {
+  type: 'text' | 'variable';
+  text: string;
+  varName?: string;
+}
+
+export function parseSegments(value: string): Segment[] {
+  if (!value) return [{ type: 'text', text: '' }];
+  const regex = /(\{\{[^{}]+\}\}|\[\[[^[\]]+\]\])/g;
+  const parts = value.split(regex);
+  const segments: Segment[] = [];
+  
+  parts.forEach(part => {
+    if (part === '') return; // skip empty parts
+    const isCurly = part.startsWith('{{') && part.endsWith('}}');
+    const isBracket = part.startsWith('[[') && part.endsWith(']]');
+    if (isCurly || isBracket) {
+      segments.push({
+        type: 'variable',
+        text: part,
+        varName: part.slice(2, -2).trim()
+      });
+    } else {
+      segments.push({
+        type: 'text',
+        text: part
+      });
+    }
+  });
+  
+  if (segments.length === 0) {
+    return [{ type: 'text', text: '' }];
+  }
+  return segments;
+}
+
+interface InteractiveDivInputProps {
+  id: string;
+  value: string;
+  onChange: (val: string) => void;
+  placeholder: string;
+  isMultiline?: boolean;
+  variablePresets?: Record<string, string[]>;
+  onKeyDown?: (e: React.KeyboardEvent<any>) => void;
+  onFocus?: () => void;
+}
+
+function valueToHtml(value: string): string {
+  if (!value) return '';
+  const regex = /(\{\{[^{}]+\}\}|\[\[[^[\]]+\]\])/g;
+  const parts = value.split(regex);
+  
+  return parts.map(part => {
+    if (!part) return '';
+    const isCurly = part.startsWith('{{') && part.endsWith('}}');
+    const isBracket = part.startsWith('[[') && part.endsWith(']]');
+    if (isCurly || isBracket) {
+      const varName = part.slice(2, -2).trim();
+      const styleAttr = isCurly ? 'curly' : 'bracket';
+      return `<button contenteditable="false" data-var="${varName}" data-style="${styleAttr}" class="inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-dashed border-amber-300 hover:border-amber-400 rounded-md text-[10px] font-bold font-mono align-middle cursor-pointer shadow-3xs select-none">${varName} <span class="text-amber-500 text-[8px] shrink-0">▾</span></button>`;
+    } else {
+      return part.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+  }).join('');
+}
+
+function htmlToValue(element: HTMLDivElement): string {
+  let val = '';
+  const childNodes = Array.from(element.childNodes);
+  childNodes.forEach(node => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      val += node.nodeValue;
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement;
+      if (el.tagName === 'BUTTON' && el.getAttribute('data-var')) {
+        const varName = el.getAttribute('data-var');
+        const style = el.getAttribute('data-style') || 'curly';
+        val += style === 'curly' ? `{{${varName}}}` : `[[${varName}]]`;
+      } else if (el.tagName === 'BR') {
+        val += '\n';
+      } else {
+        val += el.innerText;
+      }
+    }
+  });
+  return val;
+}
+
+export function InteractiveDivInput({
+  id,
+  value,
+  onChange,
+  placeholder,
+  isMultiline,
+  variablePresets = {},
+  onKeyDown,
+  onFocus,
+}: InteractiveDivInputProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [activeDropdownVar, setActiveDropdownVar] = useState<{ name: string; element: HTMLElement } | null>(null);
+  const [customInputValue, setCustomInputValue] = useState('');
+
+  // Sync internal HTML with external value ONLY if it represents different text
+  useEffect(() => {
+    if (ref.current) {
+      const currentVal = htmlToValue(ref.current);
+      if (currentVal !== value) {
+        ref.current.innerHTML = valueToHtml(value);
+      }
+    }
+  }, [value]);
+
+  const handleInput = () => {
+    if (ref.current) {
+      const newVal = htmlToValue(ref.current);
+      onChange(newVal);
+    }
+  };
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const button = target.closest('button');
+    if (button && button.getAttribute('data-var')) {
+      e.preventDefault();
+      e.stopPropagation();
+      const varName = button.getAttribute('data-var') || '';
+      setActiveDropdownVar({
+        name: varName,
+        element: button
+      });
+      setCustomInputValue('');
+    } else {
+      setActiveDropdownVar(null);
+    }
+  };
+
+  const handleSelectPreset = (preset: string) => {
+    if (!activeDropdownVar || !ref.current) return;
+    
+    const buttonEl = activeDropdownVar.element;
+    
+    // Replace the button in the DOM with a text node of the preset!
+    const textNode = document.createTextNode(preset);
+    buttonEl.parentNode?.replaceChild(textNode, buttonEl);
+    
+    // Sync change back to state
+    const newVal = htmlToValue(ref.current);
+    onChange(newVal);
+    setActiveDropdownVar(null);
+    
+    // Keep focus
+    ref.current.focus();
+  };
+
+  const handleCustomInputSubmit = () => {
+    if (customInputValue.trim()) {
+      handleSelectPreset(customInputValue.trim());
+    }
+  };
+
+  const presets = activeDropdownVar ? variablePresets[activeDropdownVar.name] || [] : [];
+
+  return (
+    <div className="relative w-full">
+      <div
+        id={id}
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
+        onClick={handleClick}
+        onFocus={onFocus}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            if (!isMultiline) {
+              e.preventDefault();
+              if (onKeyDown) {
+                onKeyDown(e);
+              }
+            }
+          }
+        }}
+        style={{
+          minHeight: '38px',
+          outline: 'none',
+        }}
+        className={`w-full bg-white border border-gray-200 focus:border-black focus:ring-1 focus:ring-black rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
+          isMultiline ? 'min-h-[85px]' : ''
+        }`}
+      />
+      
+      {!value && (
+        <div className="absolute top-2.5 left-3.5 text-gray-400 text-xs font-sans pointer-events-none select-none">
+          {placeholder}
+        </div>
+      )}
+      
+      {/* Dropdown Popover */}
+      {activeDropdownVar && (
+        <div
+          className="absolute z-50 bg-white border border-neutral-200 shadow-xl rounded-xl p-3 space-y-2.5 text-left font-sans text-xs min-w-[200px] max-w-xs animate-in fade-in slide-in-from-top-1 duration-150 text-neutral-900"
+          style={{
+            top: `${activeDropdownVar.element.offsetTop + activeDropdownVar.element.offsetHeight + 4}px`,
+            left: `${Math.min((ref.current?.offsetWidth || 220) - 200, activeDropdownVar.element.offsetLeft)}px`,
+          }}
+        >
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-1">
+            <span className="font-bold text-neutral-800 font-mono text-[9px] uppercase">Opções para: {activeDropdownVar.name}</span>
+            <button
+              type="button"
+              onClick={() => setActiveDropdownVar(null)}
+              className="text-neutral-400 hover:text-neutral-900 cursor-pointer"
+            >
+              <X size={10} />
+            </button>
+          </div>
+
+          {presets.length > 0 && (
+            <div className="space-y-1">
+              <span className="block text-[8px] font-bold font-mono text-neutral-400 uppercase tracking-wider">Escolher da lista:</span>
+              <div className="flex flex-col gap-1 max-h-28 overflow-y-auto pr-1">
+                {presets.map((preset, pIdx) => (
+                  <button
+                    key={pIdx}
+                    type="button"
+                    onClick={() => handleSelectPreset(preset)}
+                    className="w-full text-left px-2 py-1 bg-neutral-50 hover:bg-neutral-950 hover:text-white rounded transition-all font-sans text-[10px] truncate border border-neutral-200/40 cursor-pointer text-neutral-700 font-medium"
+                    title={preset}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-1 pt-1 border-t border-neutral-50">
+            <span className="block text-[8px] font-bold font-mono text-neutral-400 uppercase tracking-wider">Ou digitar valor:</span>
+            <div className="flex gap-1">
+              <input
+                type="text"
+                value={customInputValue}
+                onChange={(e) => setCustomInputValue(e.target.value)}
+                placeholder="Digite aqui..."
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleCustomInputSubmit();
+                  }
+                }}
+                className="flex-1 px-2 py-1 bg-white text-[10px] text-neutral-850 border border-neutral-200 rounded focus:border-neutral-950 focus:outline-hidden"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleCustomInputSubmit}
+                className="px-2 py-1 bg-neutral-950 text-white font-bold text-[9px] rounded cursor-pointer"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface QuickFillModalProps {
   template: Template | null;
   onClose: () => void;
@@ -193,6 +461,7 @@ export default function QuickFillModal({
   const [copied, setCopied] = useState(false);
   const [variables, setVariables] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
+  const [activeFocusedVar, setActiveFocusedVar] = useState<string | null>(null);
   const [activeCalendarVar, setActiveCalendarVar] = useState<string | null>(null);
   const [calendarYear, setCalendarYear] = useState(new Date().getFullYear());
   const [calendarMonth, setCalendarMonth] = useState(new Date().getMonth());
@@ -796,42 +1065,38 @@ export default function QuickFillModal({
                         </span>
                       </div>
                       
-                      {isMultiline ? (
-                        <textarea
-                          id={`pip-input-${varName}`}
-                          placeholder={`Inserir valor para ${varName}...`}
-                          value={values[varName] || ''}
-                          rows={3}
-                          onChange={(e) => handleInputChange(varName, e.target.value)}
-                          onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
-                          className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs resize-y"
-                        />
-                      ) : (
+                      {isDate ? (
                         <div className="space-y-2">
                           <input
                             id={`pip-input-${varName}`}
                             type="text"
-                            placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                            placeholder="DD/MM/AAAA ou texto..."
                             value={values[varName] || ''}
                             onChange={(e) => {
-                              if (isDate) {
-                                handleDateInputChange(varName, e.target.value);
-                              } else {
-                                handleInputChange(varName, e.target.value);
-                              }
+                              handleDateInputChange(varName, e.target.value);
                             }}
                             onBlur={(e) => {
-                              if (isDate && e.target.value.trim()) {
+                              if (e.target.value.trim()) {
                                 const formatted = parseAndFormatDate(e.target.value);
                                 if (formatted !== e.target.value) {
                                   handleInputChange(varName, formatted);
                                 }
                               }
                             }}
-                            onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
+                            onKeyDown={(e) => handleFieldKeyDown(e, varName, true)}
                             className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs"
                           />
                         </div>
+                      ) : (
+                        <InteractiveDivInput
+                          id={`pip-input-${varName}`}
+                          value={values[varName] || ''}
+                          onChange={(val) => handleInputChange(varName, val)}
+                          placeholder={`Inserir valor para ${varName}...`}
+                          isMultiline={isMultiline}
+                          variablePresets={template?.variablePresets}
+                          onFocus={() => setActiveFocusedVar(varName)}
+                        />
                       )}
 
                       {/* Suggestions */}
@@ -1199,40 +1464,26 @@ export default function QuickFillModal({
                               </span>
                             </div>
                             
-                            {isMultiline ? (
-                              <textarea
-                                id={`modal-input-${varName}`}
-                                placeholder={`Inserir valor para ${varName}...`}
-                                value={values[varName] || ''}
-                                rows={2}
-                                onChange={(e) => handleInputChange(varName, e.target.value)}
-                                onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
-                                className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs resize-y"
-                              />
-                            ) : (
+                            {isDate ? (
                               <div className="space-y-2">
                                 <div className="relative flex items-center">
                                   <input
                                     id={`modal-input-${varName}`}
                                     type="text"
-                                    placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                                    placeholder="DD/MM/AAAA ou texto..."
                                     value={values[varName] || ''}
                                     onChange={(e) => {
-                                      if (isDate) {
-                                        handleDateInputChange(varName, e.target.value);
-                                      } else {
-                                        handleInputChange(varName, e.target.value);
-                                      }
+                                      handleDateInputChange(varName, e.target.value);
                                     }}
                                     onBlur={(e) => {
-                                      if (isDate && e.target.value.trim()) {
+                                      if (e.target.value.trim()) {
                                         const formatted = parseAndFormatDate(e.target.value);
                                         if (formatted !== e.target.value) {
                                           handleInputChange(varName, formatted);
                                         }
                                       }
                                     }}
-                                    onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
+                                    onKeyDown={(e) => handleFieldKeyDown(e, varName, true)}
                                     className={`w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs ${
                                       isDate ? 'pr-9' : ''
                                     }`}
@@ -1358,6 +1609,16 @@ export default function QuickFillModal({
                                   </div>
                                 )}
                               </div>
+                            ) : (
+                              <InteractiveDivInput
+                                id={`modal-input-${varName}`}
+                                value={values[varName] || ''}
+                                onChange={(val) => handleInputChange(varName, val)}
+                                placeholder={`Inserir valor para ${varName}...`}
+                                isMultiline={isMultiline}
+                                variablePresets={template?.variablePresets}
+                                onFocus={() => setActiveFocusedVar(varName)}
+                              />
                             )}
 
                             {/* Suggestions */}
@@ -1434,10 +1695,10 @@ export default function QuickFillModal({
 
                           return (
                             <div key={varName} className="space-y-1.5 group">
-                              <div className="flex justify-between items-center">
+                              <div className="flex justify-between items-center pb-1">
                                 <label
                                   htmlFor={`modal-input-${varName}`}
-                                  className="block text-xs font-semibold text-gray-700 font-mono"
+                                  className="block text-[11px] font-bold text-gray-700 font-mono"
                                 >
                                   {varName} {isMultiline && <span className="text-[10px] text-indigo-500 font-normal font-sans">(Grande)</span>}
                                 </label>
@@ -1446,63 +1707,46 @@ export default function QuickFillModal({
                                 </span>
                               </div>
                               
-                              {isMultiline ? (
-                                <textarea
-                                  id={`modal-input-${varName}`}
-                                  placeholder={`Inserir valor para ${varName}...`}
-                                  value={values[varName] || ''}
-                                  rows={3}
-                                  onChange={(e) => handleInputChange(varName, e.target.value)}
-                                  onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
-                                  className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs resize-y"
-                                />
-                              ) : (
+                              {isDate ? (
                                 <div className="space-y-2">
                                   <div className="relative flex items-center">
                                     <input
                                       id={`modal-input-${varName}`}
                                       type="text"
-                                      placeholder={isDate ? 'DD/MM/AAAA ou texto...' : `Inserir valor para ${varName}...`}
+                                      placeholder="DD/MM/AAAA ou texto..."
                                       value={values[varName] || ''}
                                       onChange={(e) => {
-                                        if (isDate) {
-                                          handleDateInputChange(varName, e.target.value);
-                                        } else {
-                                          handleInputChange(varName, e.target.value);
-                                        }
+                                        handleDateInputChange(varName, e.target.value);
                                       }}
                                       onBlur={(e) => {
-                                        if (isDate && e.target.value.trim()) {
+                                        if (e.target.value.trim()) {
                                           const formatted = parseAndFormatDate(e.target.value);
                                           if (formatted !== e.target.value) {
                                             handleInputChange(varName, formatted);
                                           }
                                         }
                                       }}
-                                      onKeyDown={(e) => handleFieldKeyDown(e, varName, isDate)}
-                                      className={`w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs ${
-                                        isDate ? 'pr-10' : ''
-                                      }`}
+                                      onKeyDown={(e) => handleFieldKeyDown(e, varName, true)}
+                                      onFocus={() => setActiveFocusedVar(varName)}
+                                      className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs pr-10"
                                     />
-                                    {isDate && (
-                                      <div className="absolute right-2 flex items-center">
-                                        <button
-                                          type="button"
-                                          onClick={() => handleToggleCalendar(varName)}
-                                          className={`p-1.5 rounded transition-colors cursor-pointer flex items-center justify-center ${
-                                            activeCalendarVar === varName 
-                                              ? 'bg-black text-white' 
-                                              : 'hover:bg-gray-100 text-gray-400 hover:text-black'
-                                          }`}
-                                          title="Escolher data no calendário"
-                                        >
-                                          <Calendar size={15} />
-                                        </button>
-                                      </div>
-                                    )}
+                                    <div className="absolute right-2 flex items-center">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleCalendar(varName)}
+                                        className={`p-1.5 rounded transition-colors cursor-pointer flex items-center justify-center ${
+                                          activeCalendarVar === varName 
+                                            ? 'bg-black text-white' 
+                                            : 'hover:bg-gray-100 text-gray-400 hover:text-black'
+                                        }`}
+                                        title="Escolher data no calendário"
+                                      >
+                                        <Calendar size={15} />
+                                      </button>
+                                    </div>
                                   </div>
 
-                                  {isDate && activeCalendarVar === varName && (
+                                  {activeCalendarVar === varName && (
                                     <div className="bg-neutral-50 border border-gray-200/80 rounded-xl p-3.5 space-y-3 animate-in slide-in-from-top-1 fade-in duration-200 shadow-xs">
                                       {/* Month/Year selector header */}
                                       <div className="flex items-center justify-between">
@@ -1628,11 +1872,21 @@ export default function QuickFillModal({
                                     </div>
                                   )}
                                 </div>
+                              ) : (
+                                <InteractiveDivInput
+                                  id={`modal-input-${varName}`}
+                                  value={values[varName] || ''}
+                                  onChange={(val) => handleInputChange(varName, val)}
+                                  placeholder={`Inserir valor para ${varName}...`}
+                                  isMultiline={isMultiline}
+                                  variablePresets={template?.variablePresets}
+                                  onFocus={() => setActiveFocusedVar(varName)}
+                                />
                               )}
 
                               {/* Quick selection presets */}
                               {presets.length > 0 && (
-                                <div className="space-y-1">
+                                <div className="space-y-1 mt-1.5">
                                   <span className="block text-[10px] text-gray-400 font-mono">Sugestões rápidas:</span>
                                   <div className="flex flex-wrap gap-1">
                                     {presets.map((preset, pIdx) => (

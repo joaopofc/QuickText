@@ -53,8 +53,20 @@ export default function TemplateForm({ categories, onSubmit, onCancel, initialDa
 
   // Track and extract variables reactively
   useEffect(() => {
-    setDetectedVars(extractVariables(content));
-  }, [content]);
+    const mainVars = extractVariables(content);
+    const allVars = new Set(mainVars);
+
+    // Recursively extract variables from any defined presets as well
+    Object.values(variablePresets).forEach((presetsList) => {
+      if (Array.isArray(presetsList)) {
+        presetsList.forEach((presetText) => {
+          extractVariables(presetText).forEach((v) => allVars.add(v));
+        });
+      }
+    });
+
+    setDetectedVars(Array.from(allVars));
+  }, [content, variablePresets]);
 
   useEffect(() => {
     setEditingPresetIdx(null);
