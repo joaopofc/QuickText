@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, RotateCcw, FileText, Check, Search, Trash2, Download, ListOrdered, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, RotateCcw, FileText, Check, Search, Trash2, ListOrdered, Settings as SettingsIcon } from 'lucide-react';
 import { Template } from './types';
 import { DEFAULT_TEMPLATES, AVAILABLE_CATEGORIES } from './defaultTemplates';
 import { extractVariables } from './utils/templateHelpers';
@@ -23,7 +23,7 @@ export default function App() {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isPositionEditorOpen, setIsPositionEditorOpen] = useState(false);
-  
+
   // Custom confirmation modal states (replaces blocked window.confirm in iframe)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);

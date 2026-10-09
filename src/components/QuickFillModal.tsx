@@ -469,7 +469,7 @@ export function InteractiveDivInput({
             }
           }}
           style={{
-            minHeight: '38px',
+            minHeight: isMultiline ? '58px' : '38px',
             outline: 'none',
             WebkitUserSelect: 'text',
             userSelect: 'text',
@@ -478,7 +478,7 @@ export function InteractiveDivInput({
             isLoading ? 'bg-neutral-50/80 cursor-not-allowed opacity-70 select-none' : ''
           } ${
             isCepVar ? 'pr-28' : ''
-          } ${isMultiline ? 'min-h-[85px]' : ''}`}
+          } ${isMultiline ? 'min-h-[58px]' : ''}`}
         />
         
         {isCepVar && (
