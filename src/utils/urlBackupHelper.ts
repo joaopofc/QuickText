@@ -72,6 +72,24 @@ export function generateBackupUrl(base64Code: string, paramName: BackupUrlParamN
 }
 
 /**
+ * Updates the browser's address bar with the base64 backup code without page reload.
+ */
+export function updateBrowserUrlWithBackup(base64Code: string, preferParam?: string): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    const existing = extractBackupCodeFromUrl();
+    const paramName = preferParam || (existing ? existing.param : 'code');
+    const url = new URL(window.location.href);
+    url.searchParams.set(paramName, base64Code);
+    window.history.replaceState(null, '', url.toString());
+    return true;
+  } catch (err) {
+    console.error('Erro ao atualizar URL no navegador:', err);
+    return false;
+  }
+}
+
+/**
  * Decodes and validates base64 / encoded JSON backup string into safe Template objects.
  */
 export function parseAndValidateBackupCode(rawStr: string): Template[] | null {

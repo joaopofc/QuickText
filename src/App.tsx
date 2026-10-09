@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, RotateCcw, FileText, Check, Search, Trash2, ListOrdered, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, RotateCcw, FileText, Check, Search, Trash2, ListOrdered, Settings as SettingsIcon, Globe, X } from 'lucide-react';
 import { Template } from './types';
 import { DEFAULT_TEMPLATES, AVAILABLE_CATEGORIES } from './defaultTemplates';
 import { extractVariables } from './utils/templateHelpers';
+import { extractBackupCodeFromUrl } from './utils/urlBackupHelper';
 import SearchDropdown from './components/SearchDropdown';
 import TemplateCard from './components/TemplateCard';
 import TemplateForm from './components/TemplateForm';
@@ -22,6 +23,8 @@ export default function App() {
   const [hasAcceptedPrivacy, setHasAcceptedPrivacy] = useState<boolean>(true); // true initially to avoid flicker, corrected on mount
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'preferences' | 'backup'>('preferences');
+  const [showUrlTemplatePrompt, setShowUrlTemplatePrompt] = useState(false);
   const [isPositionEditorOpen, setIsPositionEditorOpen] = useState(false);
 
   // Custom confirmation modal states (replaces blocked window.confirm in iframe)
@@ -95,6 +98,44 @@ export default function App() {
     localStorage.setItem('quick_text_privacy_accepted', 'true');
     setHasAcceptedPrivacy(true);
     setIsPrivacyOpen(false);
+  };
+
+  // Check if URL has template parameters a few seconds after privacy acceptance
+  useEffect(() => {
+    if (!hasAcceptedPrivacy) return;
+
+    const found = extractBackupCodeFromUrl();
+    if (!found) return;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dismissedDate = localStorage.getItem('quick_text_url_notice_dismissed_date');
+
+    // Show if first time / default templates, or at least once a day if dismissed
+    const isDefaultTemplates = templates.length === DEFAULT_TEMPLATES.length &&
+      templates.every((t) => t.id.startsWith('tpl-'));
+
+    if (dismissedDate === todayStr && !isDefaultTemplates) {
+      return;
+    }
+
+    // Wait a few seconds after confirmation before offering the templates
+    const timer = setTimeout(() => {
+      setShowUrlTemplatePrompt(true);
+    }, 2500);
+
+    return () => clearTimeout(timer);
+  }, [hasAcceptedPrivacy, templates]);
+
+  const handleAcceptUrlPrompt = () => {
+    setShowUrlTemplatePrompt(false);
+    setSettingsInitialTab('backup');
+    setIsSettingsOpen(true);
+  };
+
+  const handleDismissUrlPrompt = () => {
+    setShowUrlTemplatePrompt(false);
+    const todayStr = new Date().toISOString().slice(0, 10);
+    localStorage.setItem('quick_text_url_notice_dismissed_date', todayStr);
   };
 
   // Save to localStorage whenever templates change
@@ -342,7 +383,10 @@ export default function App() {
           <div className="flex items-center gap-2.5">
             <button
               id="header-settings-btn"
-              onClick={() => setIsSettingsOpen(true)}
+              onClick={() => {
+                setSettingsInitialTab('preferences');
+                setIsSettingsOpen(true);
+              }}
               className="px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-black bg-gray-50 hover:bg-gray-100 border border-gray-200 hover:border-gray-300 rounded-md transition-all flex items-center gap-1.5 cursor-pointer shadow-3xs"
               title="Abrir configurações de backup, amostras e fixação"
             >
@@ -581,7 +625,58 @@ export default function App() {
         onRemoveSamples={handleRemoveSamples}
         onRestoreSamples={handleRestoreSamples}
         onOpenPositionEditor={() => setIsPositionEditorOpen(true)}
+        initialTab={settingsInitialTab}
       />
+
+      {/* Floating Notification for URL Templates Available */}
+      {showUrlTemplatePrompt && hasAcceptedPrivacy && (
+        <div
+          id="url-templates-available-prompt"
+          className="fixed bottom-6 right-6 z-50 bg-neutral-950 text-white rounded-2xl p-4 shadow-2xl border border-neutral-800 max-w-sm w-full animate-in slide-in-from-bottom-4 duration-300 flex flex-col gap-3 select-none"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-neutral-800/80 rounded-xl text-neutral-300 shrink-0 border border-neutral-700/50">
+                <Globe size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-neutral-100 tracking-tight">
+                  Templates disponíveis na URL
+                </h4>
+                <p className="text-[11px] text-neutral-400 mt-0.5 leading-tight">
+                  Encontramos modelos no link desta página. Deseja adicionar?
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleDismissUrlPrompt}
+              className="text-neutral-500 hover:text-neutral-300 p-1 rounded-md transition-colors cursor-pointer"
+              title="Fechar"
+            >
+              <X size={14} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-1 border-t border-neutral-800/60">
+            <button
+              type="button"
+              onClick={handleDismissUrlPrompt}
+              className="px-3 py-1.5 text-[11px] font-semibold text-neutral-400 hover:text-neutral-200 transition-colors cursor-pointer"
+            >
+              Agora não
+            </button>
+            <button
+              type="button"
+              id="accept-url-templates-prompt-btn"
+              onClick={handleAcceptUrlPrompt}
+              className="px-3.5 py-1.5 text-[11px] font-bold bg-white text-neutral-950 hover:bg-neutral-100 rounded-lg shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Adicionar Modelos</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <PositionEditorModal
         isOpen={isPositionEditorOpen}

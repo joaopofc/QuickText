@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Check, AlertCircle, Sliders, Database, Trash2, RotateCcw, FileText, Eye, Globe } from 'lucide-react';
+import { X, Copy, Check, AlertCircle, Sliders, Database, Trash2, RotateCcw, FileText, Eye, Globe } from 'lucide-react';
 import { Template } from '../types';
-import { extractBackupCodeFromUrl, parseAndValidateBackupCode } from '../utils/urlBackupHelper';
+import { extractBackupCodeFromUrl, parseAndValidateBackupCode, updateBrowserUrlWithBackup } from '../utils/urlBackupHelper';
 import UrlImportConfirmModal from './UrlImportConfirmModal';
 
 interface SettingsModalProps {
@@ -12,6 +12,7 @@ interface SettingsModalProps {
   onRemoveSamples: () => void;
   onRestoreSamples: () => void;
   onOpenPositionEditor?: () => void;
+  initialTab?: 'preferences' | 'backup';
 }
 
 export default function SettingsModal({
@@ -21,8 +22,9 @@ export default function SettingsModal({
   onImport,
   onRemoveSamples,
   onRestoreSamples,
+  initialTab,
 }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'preferences' | 'backup'>('preferences');
+  const [activeTab, setActiveTab] = useState<'preferences' | 'backup'>(initialTab || 'preferences');
   
   // Settings states
   const [autoOpenPip, setAutoOpenPip] = useState(false);
@@ -30,6 +32,8 @@ export default function SettingsModal({
   const [defaultPipTab, setDefaultPipTab] = useState<'fill' | 'preview'>('fill');
 
   // Backup states
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [saveUrlSuccess, setSaveUrlSuccess] = useState(false);
   const [importText, setImportText] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
@@ -48,6 +52,9 @@ export default function SettingsModal({
   // Load settings on mount / open
   useEffect(() => {
     if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      }
       try {
         const saved = localStorage.getItem('quick_text_settings');
         if (saved) {
@@ -62,9 +69,10 @@ export default function SettingsModal({
       setImportError(null);
       setImportSuccess(null);
       setImportText('');
+      setSaveUrlSuccess(false);
       setUrlConfirmCandidate(null);
     }
-  }, [isOpen]);
+  }, [isOpen, initialTab]);
 
   // Save settings when changed
   const handleSaveSettings = (updates: { autoOpenPip?: boolean; enableNativePip?: boolean; defaultPipTab?: 'fill' | 'preview' }) => {
@@ -79,6 +87,43 @@ export default function SettingsModal({
     if (updates.defaultPipTab !== undefined) setDefaultPipTab(updates.defaultPipTab);
 
     localStorage.setItem('quick_text_settings', JSON.stringify(nextSettings));
+  };
+
+  // Generate Base64 (preserves position order)
+  const getBase64Data = () => {
+    try {
+      const cleanData = templates.map(({ title, content, category, variablePresets, order }, idx) => ({
+        title,
+        content,
+        category,
+        variablePresets: variablePresets || {},
+        order: typeof order === 'number' ? order : idx + 1,
+      }));
+      const jsonStr = JSON.stringify(cleanData);
+      return btoa(unescape(encodeURIComponent(jsonStr)));
+    } catch (e) {
+      console.error(e);
+      return '';
+    }
+  };
+
+  const base64Code = getBase64Data();
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(base64Code).then(() => {
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    });
+  };
+
+  const handleSaveToUrl = () => {
+    const code = getBase64Data();
+    if (!code) return;
+    const ok = updateBrowserUrlWithBackup(code);
+    if (ok) {
+      setSaveUrlSuccess(true);
+      setTimeout(() => setSaveUrlSuccess(false), 2000);
+    }
   };
 
   const parseAndValidate = (rawStr: string): Template[] | null => {
@@ -337,92 +382,150 @@ export default function SettingsModal({
               </div>
             </div>
           ) : (
-            <div className="space-y-3.5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between gap-2">
+            <div className="space-y-4 animate-in fade-in duration-200">
+              {/* Export Panel */}
+              <div className="space-y-2">
                 <div>
                   <span className="text-[12px] font-semibold text-neutral-900 block">
-                    Backup &amp; Sincronização
+                    Exportar Backup
                   </span>
                   <span className="text-[10px] text-neutral-400 font-normal block mt-0.5">
-                    Importe colando o código de sincronização ou diretamente pela URL
+                    Gera uma chave Base64 segura com todos os seus modelos
                   </span>
                 </div>
-              </div>
 
-              {/* Mode Switcher: Mesclar ao atual / Substituir tudo */}
-              <div className="flex bg-neutral-50 p-0.5 rounded-lg border border-neutral-100/50 text-[10px] font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setImportMode('merge')}
-                  className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center ${
-                    importMode === 'merge'
-                      ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
-                      : 'text-neutral-400 hover:text-neutral-800'
-                  }`}
-                >
-                  Mesclar ao atual
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setImportMode('overwrite')}
-                  className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center ${
-                    importMode === 'overwrite'
-                      ? 'bg-white text-red-700 shadow-3xs font-bold border border-red-100/30'
-                      : 'text-neutral-400 hover:text-red-500'
-                  }`}
-                >
-                  Substituir tudo
-                </button>
-              </div>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    id="export-btn-copy"
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="flex-1 py-1.5 px-3 bg-neutral-950 hover:bg-neutral-900 text-white rounded-lg transition-all font-sans text-[11px] font-bold shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    {copiedCode ? (
+                      <>
+                        <Check size={12} className="text-emerald-400 animate-pulse" />
+                        <span>Chave Copiada!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={12} />
+                        <span>Copiar Chave</span>
+                      </>
+                    )}
+                  </button>
 
-              {/* Textarea for synchronization code */}
-              <div className="relative">
-                <textarea
-                  rows={3}
-                  value={importText}
-                  onChange={(e) => setImportText(e.target.value)}
-                  placeholder="Cole seu código de sincronização ou backup aqui..."
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-[10px] font-mono focus:border-neutral-950 focus:outline-hidden bg-neutral-50/50 text-neutral-800 resize-none shadow-inner placeholder:text-neutral-300"
-                />
-              </div>
-
-              {/* Minimalist Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  type="button"
-                  id="btn-import-submit"
-                  onClick={handleImportSubmit}
-                  className="flex-1 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-850 hover:text-neutral-950 text-[11px] font-bold rounded-lg transition-all cursor-pointer border border-neutral-200/50 flex items-center justify-center gap-1.5"
-                >
-                  <Database size={11} />
-                  <span>Validar e Importar</span>
-                </button>
-
-                <button
-                  type="button"
-                  id="btn-import-url"
-                  onClick={handleImportFromUrl}
-                  className="flex-1 py-1.5 bg-neutral-950 hover:bg-neutral-900 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs"
-                  title="Busca o código da URL do navegador, cola no campo e abre o pop-up para mesclar ou substituir"
-                >
-                  <Globe size={11} />
-                  <span>Importar por URL</span>
-                </button>
-              </div>
-
-              {importError && (
-                <div className="p-2 bg-red-50 text-red-600 border border-red-100/60 rounded-lg text-[10px] flex items-center gap-1.5 animate-in fade-in duration-200">
-                  <AlertCircle size={12} className="shrink-0" />
-                  <span>{importError}</span>
+                  <button
+                    id="export-btn-save-url"
+                    type="button"
+                    onClick={handleSaveToUrl}
+                    className="flex-1 py-1.5 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-850 hover:text-neutral-950 rounded-lg transition-all font-sans text-[11px] font-bold border border-neutral-200/60 shadow-3xs flex items-center justify-center gap-1.5 cursor-pointer"
+                    title="Salva e atualiza os modelos atuais diretamente na barra de endereço da URL"
+                  >
+                    {saveUrlSuccess ? (
+                      <>
+                        <Check size={12} className="text-emerald-600 animate-pulse" />
+                        <span>URL Atualizada!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe size={12} />
+                        <span>Salvar na URL</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-              )}
+              </div>
 
-              {importSuccess && (
-                <div className="p-2 bg-emerald-50 text-emerald-700 border border-emerald-100/60 rounded-lg text-[10px] flex items-center gap-1.5 animate-in fade-in duration-200">
-                  <Check size={12} className="shrink-0 text-emerald-600" />
-                  <span>{importSuccess}</span>
+              <div className="h-[1px] bg-neutral-100/70" />
+
+              {/* Import Panel */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <span className="text-[12px] font-semibold text-neutral-900 block">
+                      Importar Backup
+                    </span>
+                    <span className="text-[10px] text-neutral-400 font-normal block mt-0.5">
+                      Restaure modelos colando a chave Base64 ou diretamente pela URL
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                {/* Mode Switcher: Mesclar ao atual / Substituir tudo */}
+                <div className="flex bg-neutral-50 p-0.5 rounded-lg border border-neutral-100/50 text-[10px] font-semibold">
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('merge')}
+                    className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center ${
+                      importMode === 'merge'
+                        ? 'bg-white text-neutral-950 shadow-3xs font-bold border border-neutral-100/40'
+                        : 'text-neutral-400 hover:text-neutral-800'
+                    }`}
+                  >
+                    Mesclar ao atual
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setImportMode('overwrite')}
+                    className={`flex-1 py-1 rounded-md transition-all cursor-pointer text-center ${
+                      importMode === 'overwrite'
+                        ? 'bg-white text-red-700 shadow-3xs font-bold border border-red-100/30'
+                        : 'text-neutral-400 hover:text-red-500'
+                    }`}
+                  >
+                    Substituir tudo
+                  </button>
+                </div>
+
+                {/* Textarea for synchronization code */}
+                <div className="relative">
+                  <textarea
+                    rows={2}
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    placeholder="Cole seu código de sincronização ou backup aqui..."
+                    className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-[10px] font-mono focus:border-neutral-950 focus:outline-hidden bg-neutral-50/50 text-neutral-800 resize-none shadow-inner placeholder:text-neutral-300"
+                  />
+                </div>
+
+                {/* Minimalist Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button
+                    type="button"
+                    id="btn-import-submit"
+                    onClick={handleImportSubmit}
+                    className="flex-1 py-1.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-850 hover:text-neutral-950 text-[11px] font-bold rounded-lg transition-all cursor-pointer border border-neutral-200/50 flex items-center justify-center gap-1.5"
+                  >
+                    <Database size={11} />
+                    <span>Validar e Importar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    id="btn-import-url"
+                    onClick={handleImportFromUrl}
+                    className="flex-1 py-1.5 bg-neutral-950 hover:bg-neutral-900 text-white text-[11px] font-bold rounded-lg transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-3xs"
+                    title="Busca o código da URL do navegador, cola no campo e abre o pop-up para mesclar ou substituir"
+                  >
+                    <Globe size={11} />
+                    <span>Importar por URL</span>
+                  </button>
+                </div>
+
+                {importError && (
+                  <div className="p-2 bg-red-50 text-red-600 border border-red-100/60 rounded-lg text-[10px] flex items-center gap-1.5 animate-in fade-in duration-200">
+                    <AlertCircle size={12} className="shrink-0" />
+                    <span>{importError}</span>
+                  </div>
+                )}
+
+                {importSuccess && (
+                  <div className="p-2 bg-emerald-50 text-emerald-700 border border-emerald-100/60 rounded-lg text-[10px] flex items-center gap-1.5 animate-in fade-in duration-200">
+                    <Check size={12} className="shrink-0 text-emerald-600" />
+                    <span>{importSuccess}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
