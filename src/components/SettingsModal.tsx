@@ -40,6 +40,7 @@ export default function SettingsModal({
   // Settings states
   const [autoOpenPip, setAutoOpenPip] = useState(false);
   const [enableNativePip, setEnableNativePip] = useState(true);
+  const [enableCtrlPipToggle, setEnableCtrlPipToggle] = useState(true);
   const [defaultPipTab, setDefaultPipTab] = useState<'fill' | 'preview'>('fill');
 
   // Backup & Version states
@@ -80,6 +81,7 @@ export default function SettingsModal({
           const parsed = JSON.parse(saved);
           setAutoOpenPip(!!parsed.autoOpenPip);
           setEnableNativePip(parsed.enableNativePip !== false);
+          setEnableCtrlPipToggle(parsed.enableCtrlPipToggle !== false);
           setDefaultPipTab(parsed.defaultPipTab === 'preview' ? 'preview' : 'fill');
         }
       } catch (e) {
@@ -94,15 +96,22 @@ export default function SettingsModal({
   }, [isOpen, initialTab, templates]);
 
   // Save settings when changed
-  const handleSaveSettings = (updates: { autoOpenPip?: boolean; enableNativePip?: boolean; defaultPipTab?: 'fill' | 'preview' }) => {
+  const handleSaveSettings = (updates: {
+    autoOpenPip?: boolean;
+    enableNativePip?: boolean;
+    enableCtrlPipToggle?: boolean;
+    defaultPipTab?: 'fill' | 'preview';
+  }) => {
     const nextSettings = {
       autoOpenPip: updates.autoOpenPip !== undefined ? updates.autoOpenPip : autoOpenPip,
       enableNativePip: updates.enableNativePip !== undefined ? updates.enableNativePip : enableNativePip,
+      enableCtrlPipToggle: updates.enableCtrlPipToggle !== undefined ? updates.enableCtrlPipToggle : enableCtrlPipToggle,
       defaultPipTab: updates.defaultPipTab !== undefined ? updates.defaultPipTab : defaultPipTab,
     };
 
     if (updates.autoOpenPip !== undefined) setAutoOpenPip(updates.autoOpenPip);
     if (updates.enableNativePip !== undefined) setEnableNativePip(updates.enableNativePip);
+    if (updates.enableCtrlPipToggle !== undefined) setEnableCtrlPipToggle(updates.enableCtrlPipToggle);
     if (updates.defaultPipTab !== undefined) setDefaultPipTab(updates.defaultPipTab);
 
     localStorage.setItem('quick_text_settings', JSON.stringify(nextSettings));
@@ -329,6 +338,34 @@ export default function SettingsModal({
                     type="checkbox"
                     checked={enableNativePip}
                     onChange={(e) => handleSaveSettings({ enableNativePip: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5.5 bg-neutral-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:bg-neutral-900 shadow-3xs"></div>
+                </label>
+              </div>
+
+              <div className="h-[1px] bg-neutral-100/70" />
+
+              {/* Option 3: enableCtrlPipToggle */}
+              <div className="flex items-center justify-between py-1">
+                <div className="pr-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-semibold text-neutral-800 block">
+                      Alternar PiP com a tecla Ctrl
+                    </span>
+                    <span className="text-[9px] font-mono font-bold bg-neutral-100 text-neutral-700 px-1 py-0.2 rounded border border-neutral-200/60">
+                      Ctrl
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 font-normal leading-normal block mt-0.5 max-w-[220px]">
+                    Ao pressionar Ctrl no preenchimento: se fechado abre o PiP, se aberto minimiza
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableCtrlPipToggle}
+                    onChange={(e) => handleSaveSettings({ enableCtrlPipToggle: e.target.checked })}
                     className="sr-only peer"
                   />
                   <div className="w-9 h-5.5 bg-neutral-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:bg-neutral-900 shadow-3xs"></div>

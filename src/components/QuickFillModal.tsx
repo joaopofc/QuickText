@@ -619,6 +619,9 @@ export default function QuickFillModal({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef<{ startX: number; startY: number; posX: number; posY: number }>({ startX: 0, startY: 0, posX: 0, posY: 0 });
+  const [enableCtrlPipToggle, setEnableCtrlPipToggle] = useState(true);
+  const ctrlPressedRef = useRef(false);
+  const ctrlComboUsedRef = useRef(false);
 
   // Real OS-level Document Picture-in-Picture (over other windows/tabs)
   const [externalPipWindow, setExternalPipWindow] = useState<Window | null>(null);
@@ -855,12 +858,14 @@ export default function QuickFillModal({
       let autoOpen = false;
       let initialTab: 'fill' | 'preview' = 'fill';
       let nativePipEnabled = true;
+      let ctrlPipToggleEnabled = true;
       try {
         const savedSettings = localStorage.getItem('quick_text_settings');
         if (savedSettings) {
           const parsed = JSON.parse(savedSettings);
           autoOpen = !!parsed.autoOpenPip;
           nativePipEnabled = parsed.enableNativePip !== false;
+          ctrlPipToggleEnabled = parsed.enableCtrlPipToggle !== false;
           if (parsed.defaultPipTab === 'fill' || parsed.defaultPipTab === 'preview') {
             initialTab = parsed.defaultPipTab;
           }
@@ -871,6 +876,7 @@ export default function QuickFillModal({
 
       setPipTab(initialTab);
       setShowNativePipButton(nativePipEnabled);
+      setEnableCtrlPipToggle(ctrlPipToggleEnabled);
 
       // Auto focus the first variable input for lightning-fast typing
       setTimeout(() => {
@@ -890,6 +896,70 @@ export default function QuickFillModal({
       }
     }
   }, [template]);
+
+  // Shortcut: Single tap of Ctrl key toggles PiP mode
+  // - If PiP is closed -> opens PiP mode
+  // - If PiP is open -> minimizes PiP mode (or expands if already minimized)
+  useEffect(() => {
+    if (!template || !enableCtrlPipToggle) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Control') {
+        ctrlPressedRef.current = true;
+        ctrlComboUsedRef.current = false;
+      } else if (e.ctrlKey) {
+        // Combination like Ctrl+C, Ctrl+V, Ctrl+A was pressed, do not toggle PiP
+        ctrlComboUsedRef.current = true;
+      }
+    };
+
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.key === 'Control') {
+        if (ctrlPressedRef.current && !ctrlComboUsedRef.current) {
+          // Pure standalone tap on Ctrl!
+          if (externalPipWindow) {
+            // External PiP window active
+            setIsMinimized((prev) => !prev);
+          } else if (!isPipMode) {
+            // PiP closed -> Open PiP
+            setIsPipMode(true);
+            setIsMinimized(false);
+            setPosition({ x: 0, y: 0 });
+          } else {
+            // PiP open -> Minimize (or expand if already minimized)
+            setIsMinimized((prev) => !prev);
+          }
+        }
+        ctrlPressedRef.current = false;
+        ctrlComboUsedRef.current = false;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+
+    if (externalPipWindow) {
+      try {
+        externalPipWindow.addEventListener('keydown', handleKeyDown);
+        externalPipWindow.addEventListener('keyup', handleKeyUp);
+      } catch (err) {
+        console.warn('Could not attach shortcut listeners to external PiP window:', err);
+      }
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      if (externalPipWindow) {
+        try {
+          externalPipWindow.removeEventListener('keydown', handleKeyDown);
+          externalPipWindow.removeEventListener('keyup', handleKeyUp);
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [template, enableCtrlPipToggle, isPipMode, isMinimized, externalPipWindow]);
 
   if (!template) return null;
 
@@ -1564,7 +1634,7 @@ export default function QuickFillModal({
                   ? 'bg-black text-white hover:bg-neutral-800' 
                   : 'text-gray-400 hover:text-black hover:bg-gray-100'
               }`}
-              title={isPipMode ? "Voltar para o modo tela cheia" : "Entrar no modo flutuante (PiP)"}
+              title={isPipMode ? "Voltar para o modo tela cheia (Ctrl para minimizar)" : "Entrar no modo flutuante PiP (Atalho: Ctrl)"}
             >
               <Layers size={13} />
             </button>
@@ -1575,7 +1645,7 @@ export default function QuickFillModal({
                 type="button"
                 onClick={() => setIsMinimized(!isMinimized)}
                 className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all cursor-pointer"
-                title={isMinimized ? "Expandir painel" : "Minimizar painel"}
+                title={isMinimized ? "Expandir painel (Ctrl)" : "Minimizar painel (Ctrl)"}
               >
                 {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
               </button>
