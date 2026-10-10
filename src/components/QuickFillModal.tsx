@@ -671,29 +671,53 @@ export default function QuickFillModal({
   }, [externalPipWindow]);
 
   const updateMinimizedState = (minimized: boolean) => {
-    startExternalPip(minimized);
+    setIsMinimized(minimized);
+    if (externalPipWindow) {
+      try {
+        const w = minimized ? 320 : 480;
+        const h = minimized ? 90 : 620;
+        externalPipWindow.resizeTo(w, h);
+
+        const body = externalPipWindow.document.body;
+        const html = externalPipWindow.document.documentElement;
+        if (body) {
+          body.style.backgroundColor = minimized ? '#000000' : '#ffffff';
+          body.style.color = minimized ? '#ffffff' : '#0b0f19';
+        }
+        if (html) {
+          html.style.backgroundColor = minimized ? '#000000' : '#ffffff';
+        }
+      } catch (err) {
+        console.warn('Could not resize external PiP window:', err);
+      }
+    }
   };
 
   const startExternalPip = async (minimizedState: boolean = false) => {
+    const isMin = typeof minimizedState === 'boolean' ? minimizedState : false;
+
+    // If external PiP is already open, focus it and update minimized state
+    if (externalPipWindow && !externalPipWindow.closed) {
+      try {
+        externalPipWindow.focus();
+        updateMinimizedState(isMin);
+        return;
+      } catch {
+        // window might be invalid, proceed to requestWindow
+      }
+    }
+
     if (!('documentPictureInPicture' in window)) {
-      alert('Seu navegador não oferece suporte nativo ao Picture-in-Picture de Documentos. Para que flutue sobre qualquer outra aba ou aplicativo do computador, use o Google Chrome ou Microsoft Edge!');
+      setIsPipMode(true);
+      setIsMinimized(isMin);
       return;
     }
 
     try {
-      setIsMinimized(minimizedState);
-      // Close any existing one
-      if (externalPipWindow) {
-        try {
-          externalPipWindow.close();
-        } catch (e) {
-          console.error(e);
-        }
-        setExternalPipWindow(null);
-      }
+      setIsMinimized(isMin);
 
-      const w = minimizedState ? 320 : 480;
-      const h = minimizedState ? 85 : 620;
+      const w = isMin ? 320 : 480;
+      const h = isMin ? 90 : 620;
 
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({
         width: w,
@@ -713,12 +737,14 @@ export default function QuickFillModal({
         body.style.width = '100%';
         body.style.height = '100%';
         body.style.overflow = 'hidden';
-        if (minimizedState) {
+        if (isMin) {
           body.style.backgroundColor = '#000000';
           body.style.color = '#ffffff';
+          html.style.backgroundColor = '#000000';
         } else {
           body.style.backgroundColor = '#ffffff';
           body.style.color = '#0b0f19';
+          html.style.backgroundColor = '#ffffff';
         }
       } catch (e) {
         console.warn('Could not set PiP body/html styles:', e);
@@ -772,8 +798,12 @@ export default function QuickFillModal({
       });
 
       setExternalPipWindow(pipWin);
+      setIsPipMode(false);
     } catch (err) {
-      console.error('Falha ao abrir Picture-in-Picture externo:', err);
+      console.warn('Falha ao abrir Picture-in-Picture externo, ativando modo flutuante integrado:', err);
+      // Fallback seamlessly to the in-page PiP floating mode
+      setIsPipMode(true);
+      setIsMinimized(isMin);
     }
   };
 
@@ -930,15 +960,16 @@ export default function QuickFillModal({
       // Auto launch Picture-in-Picture window if enabled and supported
       if (autoOpen && 'documentPictureInPicture' in window) {
         setTimeout(() => {
-          startExternalPip();
+          startExternalPip(false);
         }, 150);
       }
     }
   }, [template]);
 
   // Shortcut: Single tap of Ctrl key toggles PiP mode
-  // - If PiP is closed -> opens PiP mode
+  // - If PiP is closed -> opens PiP mode (starts expanded)
   // - If PiP is open -> minimizes PiP mode (or expands if already minimized)
+  // - NEVER copies on Ctrl tap (only copy button copies)
   useEffect(() => {
     if (!template || !enableCtrlPipToggle) return;
 
@@ -956,12 +987,18 @@ export default function QuickFillModal({
       if (e.key === 'Control') {
         if (ctrlPressedRef.current && !ctrlComboUsedRef.current) {
           // Pure standalone tap on Ctrl!
-          if (!externalPipWindow) {
-            // Closed -> Open external PiP ("Fixar no topo")
-            startExternalPip();
-          } else {
+          const isPipActive = Boolean(externalPipWindow || isPipMode);
+          if (isPipActive) {
             // Open -> Toggle minimize/expand (Do NOT copy)
             updateMinimizedState(!isMinimized);
+          } else {
+            // Closed -> Open PiP mode (expanded)
+            if ('documentPictureInPicture' in window) {
+              startExternalPip(false);
+            } else {
+              setIsPipMode(true);
+              setIsMinimized(false);
+            }
           }
         }
         ctrlPressedRef.current = false;
@@ -1316,6 +1353,22 @@ export default function QuickFillModal({
                 </>
               )}
             </button>
+            <button
+              type="button"
+              onClick={() => updateMinimizedState(true)}
+              className="text-gray-400 hover:text-black p-1 rounded-md hover:bg-gray-100 transition-colors cursor-pointer"
+              title="Minimizar (Ctrl)"
+            >
+              <Minimize2 size={11} />
+            </button>
+            <button
+              type="button"
+              onClick={handleClose}
+              className="text-gray-400 hover:text-red-600 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+              title="Fechar (X)"
+            >
+              <X size={12} />
+            </button>
           </div>
         </div>
 
@@ -1658,7 +1711,7 @@ export default function QuickFillModal({
             {('documentPictureInPicture' in window) && showNativePipButton && (
               <button
                 type="button"
-                onClick={startExternalPip}
+                onClick={() => startExternalPip(false)}
                 className="p-1 px-2 rounded-md text-indigo-600 hover:text-white hover:bg-indigo-600 transition-all cursor-pointer flex items-center justify-center gap-1 text-[10px] font-bold bg-indigo-50 border border-indigo-100"
                 title="Destacar formulário (Sobrepõe outras abas e programas de todo o computador)"
               >
