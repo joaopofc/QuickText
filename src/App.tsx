@@ -3,7 +3,15 @@ import { Plus, RotateCcw, FileText, Check, Search, Trash2, ListOrdered, Settings
 import { Template } from './types';
 import { DEFAULT_TEMPLATES, AVAILABLE_CATEGORIES } from './defaultTemplates';
 import { extractVariables } from './utils/templateHelpers';
-import { extractBackupCodeFromUrl } from './utils/urlBackupHelper';
+import {
+  extractBackupCodeFromUrl,
+  checkUrlUpdateStatus,
+  dismissUrlBackupCode,
+  markCodeAsSyncedLocally,
+  setLocalTemplateVersion,
+  recordSavedTemplateState,
+  UrlUpdateDecision,
+} from './utils/urlBackupHelper';
 import SearchDropdown from './components/SearchDropdown';
 import TemplateCard from './components/TemplateCard';
 import TemplateForm from './components/TemplateForm';
@@ -25,6 +33,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'preferences' | 'backup'>('preferences');
   const [showUrlTemplatePrompt, setShowUrlTemplatePrompt] = useState(false);
+  const [urlDecision, setUrlDecision] = useState<UrlUpdateDecision | null>(null);
   const [isPositionEditorOpen, setIsPositionEditorOpen] = useState(false);
 
   // Custom confirmation modal states (replaces blocked window.confirm in iframe)
@@ -100,28 +109,24 @@ export default function App() {
     setIsPrivacyOpen(false);
   };
 
-  // Check if URL has template parameters a few seconds after privacy acceptance
+  // Check if URL has template parameters and determine if it offers a newer/different version
   useEffect(() => {
     if (!hasAcceptedPrivacy) return;
 
-    const found = extractBackupCodeFromUrl();
-    if (!found) return;
-
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const dismissedDate = localStorage.getItem('quick_text_url_notice_dismissed_date');
-
-    // Show if first time / default templates, or at least once a day if dismissed
-    const isDefaultTemplates = templates.length === DEFAULT_TEMPLATES.length &&
-      templates.every((t) => t.id.startsWith('tpl-'));
-
-    if (dismissedDate === todayStr && !isDefaultTemplates) {
+    // Use our smart decision engine to evaluate version & diff against current templates
+    const decision = checkUrlUpdateStatus(undefined, templates);
+    if (!decision.shouldOffer) {
+      setShowUrlTemplatePrompt(false);
+      setUrlDecision(null);
       return;
     }
 
-    // Wait a few seconds after confirmation before offering the templates
+    setUrlDecision(decision);
+
+    // Wait a brief delay after confirmation before offering the templates
     const timer = setTimeout(() => {
       setShowUrlTemplatePrompt(true);
-    }, 2500);
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [hasAcceptedPrivacy, templates]);
@@ -134,8 +139,9 @@ export default function App() {
 
   const handleDismissUrlPrompt = () => {
     setShowUrlTemplatePrompt(false);
-    const todayStr = new Date().toISOString().slice(0, 10);
-    localStorage.setItem('quick_text_url_notice_dismissed_date', todayStr);
+    if (urlDecision?.code) {
+      dismissUrlBackupCode(urlDecision.code);
+    }
   };
 
   // Save to localStorage whenever templates change
@@ -252,22 +258,43 @@ export default function App() {
   };
 
   // Handle importing data (either merges with current or overwrites)
-  const handleImport = (importedTemplates: Template[], overwrite: boolean) => {
+  const handleImport = (importedTemplates: Template[], overwrite: boolean, importedVersion?: string) => {
+    const nextVersion = importedVersion || urlDecision?.urlVersion || '1.1.0';
+    setLocalTemplateVersion(nextVersion);
+
+    let finalTemplates: Template[] = [];
     if (overwrite) {
+      finalTemplates = importedTemplates;
       saveTemplates(importedTemplates);
     } else {
       // Merge: Avoid duplicating templates with exact same title and content
-      const existingKeys = new Set(templates.map(t => `${t.title.trim().toLowerCase()}::${t.content.trim()}`));
+      const existingKeys = new Set(templates.map((t) => `${t.title.trim().toLowerCase()}::${t.content.trim()}`));
       const merged = [...templates];
-      
-      importedTemplates.forEach(item => {
+
+      importedTemplates.forEach((item) => {
         const key = `${item.title.trim().toLowerCase()}::${item.content.trim()}`;
         if (!existingKeys.has(key)) {
           merged.push(item);
         }
       });
+      finalTemplates = merged;
       saveTemplates(merged);
     }
+
+    // Record this saved state as baseline for future auto-version bumps
+    recordSavedTemplateState(finalTemplates, nextVersion);
+
+    // Mark current URL code as synced so this browser NEVER prompts again for this version
+    const found = extractBackupCodeFromUrl();
+    if (found) {
+      markCodeAsSyncedLocally(found.code, nextVersion);
+    }
+    if (urlDecision?.code) {
+      markCodeAsSyncedLocally(urlDecision.code, nextVersion);
+    }
+
+    setShowUrlTemplatePrompt(false);
+    setUrlDecision(null);
   };
 
   // Filter templates shown in the grid based on category tab selection
@@ -629,7 +656,7 @@ export default function App() {
       />
 
       {/* Floating Notification for URL Templates Available */}
-      {showUrlTemplatePrompt && hasAcceptedPrivacy && (
+      {showUrlTemplatePrompt && hasAcceptedPrivacy && urlDecision && (
         <div
           id="url-templates-available-prompt"
           className="fixed bottom-6 right-6 z-50 bg-neutral-950 text-white rounded-2xl p-4 shadow-2xl border border-neutral-800 max-w-sm w-full animate-in slide-in-from-bottom-4 duration-300 flex flex-col gap-3 select-none"
@@ -640,11 +667,22 @@ export default function App() {
                 <Globe size={16} />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-neutral-100 tracking-tight">
-                  Templates disponíveis na URL
-                </h4>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <h4 className="text-xs font-bold text-neutral-100 tracking-tight">
+                    {urlDecision.isNewerVersion
+                      ? `Nova Versão de Modelos (v${urlDecision.urlVersion})`
+                      : 'Templates disponíveis na URL'}
+                  </h4>
+                  {urlDecision.isNewerVersion && (
+                    <span className="text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-1.5 py-0.2 rounded">
+                      NOVA VERSÃO
+                    </span>
+                  )}
+                </div>
                 <p className="text-[11px] text-neutral-400 mt-0.5 leading-tight">
-                  Encontramos modelos no link desta página. Deseja adicionar?
+                  {urlDecision.isNewerVersion
+                    ? `Versão v${urlDecision.urlVersion} encontrada no link (sua versão: v${urlDecision.localVersion}). Deseja atualizar seus modelos?`
+                    : `Encontramos ${urlDecision.templateCount} modelo(s) (v${urlDecision.urlVersion}) no link desta página. Deseja adicionar?`}
                 </p>
               </div>
             </div>
@@ -672,7 +710,7 @@ export default function App() {
               onClick={handleAcceptUrlPrompt}
               className="px-3.5 py-1.5 text-[11px] font-bold bg-white text-neutral-950 hover:bg-neutral-100 rounded-lg shadow-3xs transition-all cursor-pointer flex items-center gap-1.5"
             >
-              <span>Adicionar Modelos</span>
+              <span>{urlDecision.isNewerVersion ? 'Atualizar Modelos' : 'Adicionar Modelos'}</span>
             </button>
           </div>
         </div>

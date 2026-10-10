@@ -1,14 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { X, Copy, Check, AlertCircle, Sliders, Database, Trash2, RotateCcw, FileText, Eye, Globe } from 'lucide-react';
 import { Template } from '../types';
-import { extractBackupCodeFromUrl, parseAndValidateBackupCode, updateBrowserUrlWithBackup } from '../utils/urlBackupHelper';
+import {
+  extractBackupCodeFromUrl,
+  parseAndValidateBackupPayload,
+  updateBrowserUrlWithBackup,
+  markCodeAsSyncedLocally,
+  createBackupBase64,
+  getLocalTemplateVersion,
+  setLocalTemplateVersion,
+  compareVersions,
+  computeAutomaticVersion,
+  recordSavedTemplateState,
+} from '../utils/urlBackupHelper';
 import UrlImportConfirmModal from './UrlImportConfirmModal';
 
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   templates: Template[];
-  onImport: (importedTemplates: Template[], overwrite: boolean) => void;
+  onImport: (importedTemplates: Template[], overwrite: boolean, importedVersion?: string) => void;
   onRemoveSamples: () => void;
   onRestoreSamples: () => void;
   onOpenPositionEditor?: () => void;
@@ -31,7 +42,8 @@ export default function SettingsModal({
   const [enableNativePip, setEnableNativePip] = useState(true);
   const [defaultPipTab, setDefaultPipTab] = useState<'fill' | 'preview'>('fill');
 
-  // Backup states
+  // Backup & Version states
+  const [packageVersion, setPackageVersion] = useState<string>(() => getLocalTemplateVersion());
   const [copiedCode, setCopiedCode] = useState(false);
   const [saveUrlSuccess, setSaveUrlSuccess] = useState(false);
   const [importText, setImportText] = useState('');
@@ -44,17 +56,24 @@ export default function SettingsModal({
     templates: Template[];
     paramName: string;
     sourceUrl?: string;
+    version?: string;
+    localVersion?: string;
+    isNewerVersion?: boolean;
   } | null>(null);
 
   // Count samples currently loaded
   const sampleCount = templates.filter(t => t.id.startsWith('tpl-')).length;
 
-  // Load settings on mount / open
+  // Load settings and version on mount / open
   useEffect(() => {
     if (isOpen) {
       if (initialTab) {
         setActiveTab(initialTab);
       }
+      // Pre-compute current automatic version without committing
+      const autoInfo = computeAutomaticVersion(templates, false);
+      setPackageVersion(autoInfo.version);
+
       try {
         const saved = localStorage.getItem('quick_text_settings');
         if (saved) {
@@ -72,7 +91,7 @@ export default function SettingsModal({
       setSaveUrlSuccess(false);
       setUrlConfirmCandidate(null);
     }
-  }, [isOpen, initialTab]);
+  }, [isOpen, initialTab, templates]);
 
   // Save settings when changed
   const handleSaveSettings = (updates: { autoOpenPip?: boolean; enableNativePip?: boolean; defaultPipTab?: 'fill' | 'preview' }) => {
@@ -89,49 +108,33 @@ export default function SettingsModal({
     localStorage.setItem('quick_text_settings', JSON.stringify(nextSettings));
   };
 
-  // Generate Base64 (preserves position order)
-  const getBase64Data = () => {
-    try {
-      const cleanData = templates.map(({ title, content, category, variablePresets, order }, idx) => ({
-        title,
-        content,
-        category,
-        variablePresets: variablePresets || {},
-        order: typeof order === 'number' ? order : idx + 1,
-      }));
-      const jsonStr = JSON.stringify(cleanData);
-      return btoa(unescape(encodeURIComponent(jsonStr)));
-    } catch (e) {
-      console.error(e);
-      return '';
-    }
-  };
-
-  const base64Code = getBase64Data();
-
   const handleCopyCode = () => {
-    navigator.clipboard.writeText(base64Code).then(() => {
+    // Automatically bumps version if templates were added, removed or edited since last save
+    const autoInfo = computeAutomaticVersion(templates, true);
+    setPackageVersion(autoInfo.version);
+
+    const code = createBackupBase64(templates, autoInfo.version);
+    if (!code) return;
+    navigator.clipboard.writeText(code).then(() => {
+      markCodeAsSyncedLocally(code, autoInfo.version);
       setCopiedCode(true);
       setTimeout(() => setCopiedCode(false), 2000);
     });
   };
 
   const handleSaveToUrl = () => {
-    const code = getBase64Data();
+    // Automatically bumps version if templates were added, removed or edited since last save
+    const autoInfo = computeAutomaticVersion(templates, true);
+    setPackageVersion(autoInfo.version);
+
+    const code = createBackupBase64(templates, autoInfo.version);
     if (!code) return;
-    const ok = updateBrowserUrlWithBackup(code);
+    const ok = updateBrowserUrlWithBackup(code, 'code', autoInfo.version);
     if (ok) {
+      markCodeAsSyncedLocally(code, autoInfo.version);
       setSaveUrlSuccess(true);
       setTimeout(() => setSaveUrlSuccess(false), 2000);
     }
-  };
-
-  const parseAndValidate = (rawStr: string): Template[] | null => {
-    const res = parseAndValidateBackupCode(rawStr);
-    if (!res) {
-      setImportError('Código inválido ou corrompido.');
-    }
-    return res;
   };
 
   const handleImportSubmit = () => {
@@ -142,16 +145,23 @@ export default function SettingsModal({
       return;
     }
 
-    const validated = parseAndValidate(importText);
-    if (validated) {
-      onImport(validated, importMode === 'overwrite');
-      setImportSuccess(`${validated.length} modelo(s) importado(s) com sucesso!`);
-      setImportText('');
-      setTimeout(() => {
-        setImportSuccess(null);
-        onClose();
-      }, 1200);
+    const payload = parseAndValidateBackupPayload(importText);
+    if (!payload || payload.templates.length === 0) {
+      setImportError('Código inválido ou corrompido.');
+      return;
     }
+
+    onImport(payload.templates, importMode === 'overwrite', payload.version);
+    markCodeAsSyncedLocally(importText, payload.version);
+    setLocalTemplateVersion(payload.version);
+    setPackageVersion(payload.version);
+
+    setImportSuccess(`${payload.templates.length} modelo(s) (v${payload.version}) importado(s) com sucesso!`);
+    setImportText('');
+    setTimeout(() => {
+      setImportSuccess(null);
+      onClose();
+    }, 1200);
   };
 
   const handleImportFromUrl = () => {
@@ -167,24 +177,45 @@ export default function SettingsModal({
     // Busca e cola o código da URL diretamente no campo para transparência
     setImportText(found.code);
 
-    const validated = parseAndValidateBackupCode(found.code);
-    if (!validated || validated.length === 0) {
+    const payload = parseAndValidateBackupPayload(found.code);
+    if (!payload || payload.templates.length === 0) {
       setImportError(`Não foi possível decodificar os modelos do parâmetro "?${found.param}".`);
       return;
     }
 
+    const currentVer = getLocalTemplateVersion();
+    const isNewer = compareVersions(payload.version, currentVer) > 0;
+
     // Abre pop-up para escolher mesclar atual ou substituir tudo
     setUrlConfirmCandidate({
-      templates: validated,
+      templates: payload.templates,
       paramName: found.param,
       sourceUrl: found.fullUrl,
+      version: payload.version,
+      localVersion: currentVer,
+      isNewerVersion: isNewer,
     });
   };
 
   const handleExecuteUrlConfirm = (mode: 'merge' | 'overwrite') => {
     if (!urlConfirmCandidate) return;
-    onImport(urlConfirmCandidate.templates, mode === 'overwrite');
-    setImportSuccess(`${urlConfirmCandidate.templates.length} modelo(s) importado(s) da URL com sucesso (${mode === 'merge' ? 'mesclado' : 'substituído'})!`);
+    const candidateVer = urlConfirmCandidate.version || '1.0';
+    onImport(urlConfirmCandidate.templates, mode === 'overwrite', candidateVer);
+    
+    // Mark the URL code as synced so this device never prompts for this URL version again
+    const found = extractBackupCodeFromUrl();
+    if (found) {
+      markCodeAsSyncedLocally(found.code, candidateVer);
+    }
+    if (importText) {
+      markCodeAsSyncedLocally(importText, candidateVer);
+    }
+    setLocalTemplateVersion(candidateVer);
+    setPackageVersion(candidateVer);
+
+    setImportSuccess(
+      `${urlConfirmCandidate.templates.length} modelo(s) (v${candidateVer}) importado(s) da URL com sucesso (${mode === 'merge' ? 'mesclado' : 'substituído'})!`
+    );
     setUrlConfirmCandidate(null);
     setTimeout(() => {
       setImportSuccess(null);
@@ -384,14 +415,30 @@ export default function SettingsModal({
           ) : (
             <div className="space-y-4 animate-in fade-in duration-200">
               {/* Export Panel */}
-              <div className="space-y-2">
-                <div>
-                  <span className="text-[12px] font-semibold text-neutral-900 block">
-                    Exportar Backup
-                  </span>
-                  <span className="text-[10px] text-neutral-400 font-normal block mt-0.5">
-                    Gera uma chave Base64 segura com todos os seus modelos
-                  </span>
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-[12px] font-semibold text-neutral-900 block">
+                      Exportar Backup
+                    </span>
+                    <span className="text-[10px] text-neutral-400 font-normal block mt-0.5">
+                      Gera uma chave Base64 segura com todos os seus modelos
+                    </span>
+                  </div>
+
+                  {/* Automatic Version Indicator */}
+                  <div
+                    className="flex items-center gap-1.5 bg-neutral-100/70 px-2.5 py-1 rounded-lg border border-neutral-200/60 text-[10px]"
+                    title="Versão calculada automaticamente com base nas alterações dos modelos"
+                  >
+                    <span className="text-neutral-500 font-medium">Versão:</span>
+                    <span className="font-mono font-bold text-neutral-900 bg-white px-1.5 py-0.5 rounded border border-neutral-200/70 shadow-3xs">
+                      v{packageVersion}
+                    </span>
+                    <span className="text-[9px] text-neutral-400 font-sans">
+                      (auto)
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -404,7 +451,7 @@ export default function SettingsModal({
                     {copiedCode ? (
                       <>
                         <Check size={12} className="text-emerald-400 animate-pulse" />
-                        <span>Chave Copiada!</span>
+                        <span>Chave Copiada (v{packageVersion})!</span>
                       </>
                     ) : (
                       <>
@@ -424,7 +471,7 @@ export default function SettingsModal({
                     {saveUrlSuccess ? (
                       <>
                         <Check size={12} className="text-emerald-600 animate-pulse" />
-                        <span>URL Atualizada!</span>
+                        <span>URL Salva (v{packageVersion})!</span>
                       </>
                     ) : (
                       <>

@@ -9,6 +9,9 @@ interface UrlImportConfirmModalProps {
     templates: Template[];
     paramName: string;
     sourceUrl?: string;
+    version?: string;
+    localVersion?: string;
+    isNewerVersion?: boolean;
   } | null;
   onConfirm: (mode: 'merge' | 'overwrite') => void;
 }
@@ -24,6 +27,8 @@ export default function UrlImportConfirmModal({
   if (!isOpen || !candidate) return null;
 
   const count = candidate.templates.length;
+  const urlVer = candidate.version || '1.0';
+  const localVer = candidate.localVersion;
 
   return (
     <div
@@ -44,11 +49,26 @@ export default function UrlImportConfirmModal({
               <Globe size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-neutral-900 tracking-tight font-sans">
-                Importar Modelos da URL
-              </h3>
-              <p className="text-[11px] text-neutral-500 font-normal">
-                {count} modelo{count > 1 ? 's' : ''} detectado{count > 1 ? 's' : ''} via <code className="text-neutral-800 font-mono font-bold bg-neutral-100 px-1 py-0.5 rounded">?{candidate.paramName}</code>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h3 className="text-sm font-bold text-neutral-900 tracking-tight font-sans">
+                  Importar Modelos da URL
+                </h3>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-neutral-900 text-white">
+                  v{urlVer}
+                </span>
+                {candidate.isNewerVersion && (
+                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 uppercase tracking-tight">
+                    Mais Recente
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-neutral-500 font-normal mt-0.5">
+                {count} modelo{count > 1 ? 's' : ''} via <code className="text-neutral-800 font-mono font-bold bg-neutral-100 px-1 py-0.5 rounded">?{candidate.paramName}</code>
+                {localVer && (
+                  <span className="text-neutral-400 ml-1.5">
+                    (sua versão: v{localVer})
+                  </span>
+                )}
               </p>
             </div>
           </div>
