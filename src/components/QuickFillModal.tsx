@@ -674,13 +674,22 @@ export default function QuickFillModal({
     if (externalPipWindow) {
       try {
         const body = externalPipWindow.document.body;
+        const html = externalPipWindow.document.documentElement;
+        html.style.margin = '0';
+        html.style.padding = '0';
+        html.style.width = '100%';
+        html.style.height = '100%';
+        body.style.margin = '0';
+        body.style.padding = '0';
+        body.style.width = '100%';
+        body.style.height = '100%';
+        body.style.overflow = 'hidden';
+        body.style.backgroundColor = '#ffffff';
+        body.style.color = '#0b0f19';
+
         if (isMinimized) {
-          body.style.backgroundColor = '#000000';
-          body.style.color = '#ffffff';
-          externalPipWindow.resizeTo(320, 100);
+          externalPipWindow.resizeTo(320, 85);
         } else {
-          body.style.backgroundColor = '#ffffff';
-          body.style.color = '#0b0f19';
           externalPipWindow.resizeTo(480, 620);
         }
       } catch (e) {
@@ -917,17 +926,12 @@ export default function QuickFillModal({
       if (e.key === 'Control') {
         if (ctrlPressedRef.current && !ctrlComboUsedRef.current) {
           // Pure standalone tap on Ctrl!
-          if (externalPipWindow) {
-            // External PiP window active
-            setIsMinimized((prev) => !prev);
-          } else if (!isPipMode) {
-            // PiP closed -> Open PiP
-            setIsPipMode(true);
-            setIsMinimized(false);
-            setPosition({ x: 0, y: 0 });
+          if (!externalPipWindow) {
+            // Closed -> Open external PiP ("Fixar no topo")
+            startExternalPip();
           } else {
-            // PiP open -> Minimize (or expand if already minimized)
-            setIsMinimized((prev) => !prev);
+            // Open -> Copy and minimize/close ("clicar no botão de copiar")
+            handleCopy();
           }
         }
         ctrlPressedRef.current = false;
@@ -1171,14 +1175,14 @@ export default function QuickFillModal({
 
     if (isMinimized) {
       return (
-        <div className="bg-black text-white h-screen w-screen flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
+        <div className="bg-white text-gray-900 h-screen w-screen flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-gray-200 shadow-sm rounded-xl">
           <button
             type="button"
             onClick={() => setIsMinimized(false)}
-            className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer text-white hover:text-gray-200 transition-all focus:outline-hidden truncate flex-1 mr-2 text-left"
+            className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer text-gray-900 hover:text-indigo-600 transition-all focus:outline-hidden truncate flex-1 mr-2 text-left"
             title="Expandir Assistente"
           >
-            <Layers size={12} className="text-gray-300 animate-pulse shrink-0" />
+            <Layers size={12} className="text-indigo-600 animate-pulse shrink-0" />
             <span className="truncate">{template.title}</span>
           </button>
           
@@ -1186,14 +1190,14 @@ export default function QuickFillModal({
             <button
               type="button"
               onClick={() => setIsMinimized(false)}
-              className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-[10px] rounded-md border border-neutral-700 transition-all cursor-pointer"
+              className="px-2 py-0.5 bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold text-[10px] rounded-md border border-gray-200 transition-all cursor-pointer"
             >
               Restaurar
             </button>
             <button
               type="button"
               onClick={handleClose}
-              className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-neutral-800 transition-colors cursor-pointer"
+              className="text-gray-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-colors cursor-pointer"
               title="Fechar"
             >
               <X size={12} />
