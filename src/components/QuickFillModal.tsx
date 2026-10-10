@@ -677,21 +677,25 @@ export default function QuickFillModal({
         const html = externalPipWindow.document.documentElement;
         html.style.margin = '0';
         html.style.padding = '0';
-        html.style.width = '100%';
-        html.style.height = '100%';
         body.style.margin = '0';
         body.style.padding = '0';
-        body.style.width = '100%';
-        body.style.height = '100%';
         body.style.overflow = 'hidden';
-        body.style.backgroundColor = '#ffffff';
-        body.style.color = '#0b0f19';
 
         if (isMinimized) {
           body.style.backgroundColor = '#000000';
           body.style.color = '#ffffff';
+          html.style.width = '320px';
+          html.style.height = '85px';
+          body.style.width = '320px';
+          body.style.height = '85px';
           externalPipWindow.resizeTo(320, 85);
         } else {
+          body.style.backgroundColor = '#ffffff';
+          body.style.color = '#0b0f19';
+          html.style.width = '100%';
+          html.style.height = '100%';
+          body.style.width = '100%';
+          body.style.height = '100%';
           externalPipWindow.resizeTo(480, 620);
         }
       } catch (e) {
@@ -704,9 +708,15 @@ export default function QuickFillModal({
     setIsMinimized(minimized);
     if (externalPipWindow) {
       try {
+        const body = externalPipWindow.document.body;
+        const html = externalPipWindow.document.documentElement;
         if (minimized) {
+          if (html) { html.style.width = '320px'; html.style.height = '85px'; }
+          if (body) { body.style.width = '320px'; body.style.height = '85px'; }
           externalPipWindow.resizeTo(320, 85);
         } else {
+          if (html) { html.style.width = '100%'; html.style.height = '100%'; }
+          if (body) { body.style.width = '100%'; body.style.height = '100%'; }
           externalPipWindow.resizeTo(480, 620);
         }
       } catch (e) {
@@ -1226,7 +1236,7 @@ export default function QuickFillModal({
 
     if (isMinimized) {
       return (
-        <div className="bg-black text-white h-screen w-screen flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
+        <div className="bg-black text-white h-[85px] w-[320px] flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
           <button
             type="button"
             onClick={() => updateMinimizedState(false)}
