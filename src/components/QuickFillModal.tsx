@@ -615,6 +615,24 @@ export default function QuickFillModal({
   // Picture-in-Picture (PiP) and floating states
   const [isPipMode, setIsPipMode] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
+  const [externalPipWindow, setExternalPipWindow] = useState<Window | null>(null);
+  
+  const isMinimizedRef = useRef(false);
+  const isPipModeRef = useRef(false);
+  const externalPipWindowRef = useRef<Window | null>(null);
+
+  useEffect(() => {
+    isMinimizedRef.current = isMinimized;
+  }, [isMinimized]);
+
+  useEffect(() => {
+    isPipModeRef.current = isPipMode;
+  }, [isPipMode]);
+
+  useEffect(() => {
+    externalPipWindowRef.current = externalPipWindow;
+  }, [externalPipWindow]);
+
   const [pipTab, setPipTab] = useState<'fill' | 'preview'>('fill');
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -624,7 +642,6 @@ export default function QuickFillModal({
   const ctrlComboUsedRef = useRef(false);
 
   // Real OS-level Document Picture-in-Picture (over other windows/tabs)
-  const [externalPipWindow, setExternalPipWindow] = useState<Window | null>(null);
   const [showNativePipButton, setShowNativePipButton] = useState(true);
 
   // Font size state for text preview
