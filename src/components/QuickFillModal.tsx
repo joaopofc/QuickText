@@ -571,7 +571,6 @@ export function InteractiveDivInput({
                   }
                 }}
                 className="flex-1 px-2 py-1 bg-white text-[10px] text-neutral-850 border border-neutral-200 rounded focus:border-neutral-950 focus:outline-hidden"
-                autoFocus
               />
               <button
                 type="button"

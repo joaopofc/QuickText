@@ -308,7 +308,6 @@ export default function TemplateForm({ categories, onSubmit, onCancel, initialDa
                                 }
                               }}
                               className="flex-1 px-2 py-1 bg-white text-xs text-gray-900 border border-gray-300 rounded focus:border-black focus:outline-hidden font-sans"
-                              autoFocus
                             />
                           ) : (
                             <span className="text-xs text-gray-700 font-sans truncate pr-2 flex-1">{preset}</span>
