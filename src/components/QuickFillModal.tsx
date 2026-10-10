@@ -768,6 +768,16 @@ export default function QuickFillModal({
       // Listen for window closed by user
       pipWin.addEventListener('pagehide', () => {
         setExternalPipWindow(null);
+        setIsMinimized(false);
+        setIsPipMode(false);
+        setTimeout(() => {
+          const firstInput = document.querySelector('input, textarea, [tabindex="0"]') as HTMLElement;
+          if (firstInput) {
+            firstInput.focus();
+          } else {
+            window.focus();
+          }
+        }, 100);
       });
 
       setExternalPipWindow(pipWin);
@@ -788,6 +798,14 @@ export default function QuickFillModal({
       setExternalPipWindow(null);
     }
     onClose();
+    setTimeout(() => {
+      const firstInput = document.querySelector('input, textarea, [tabindex="0"]') as HTMLElement;
+      if (firstInput) {
+        firstInput.focus();
+      } else {
+        window.focus();
+      }
+    }, 100);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -962,11 +980,17 @@ export default function QuickFillModal({
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('keyup', handleKeyUp);
 
     if (externalPipWindow) {
       try {
         externalPipWindow.addEventListener('keydown', handleKeyDown);
         externalPipWindow.addEventListener('keyup', handleKeyUp);
+        if (externalPipWindow.document) {
+          externalPipWindow.document.addEventListener('keydown', handleKeyDown);
+          externalPipWindow.document.addEventListener('keyup', handleKeyUp);
+        }
       } catch (err) {
         console.warn('Could not attach shortcut listeners to external PiP window:', err);
       }
@@ -975,10 +999,16 @@ export default function QuickFillModal({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keyup', handleKeyUp);
       if (externalPipWindow) {
         try {
           externalPipWindow.removeEventListener('keydown', handleKeyDown);
           externalPipWindow.removeEventListener('keyup', handleKeyUp);
+          if (externalPipWindow.document) {
+            externalPipWindow.document.removeEventListener('keydown', handleKeyDown);
+            externalPipWindow.document.removeEventListener('keyup', handleKeyUp);
+          }
         } catch {
           // ignore
         }
