@@ -1755,18 +1755,6 @@ export default function QuickFillModal({
               <Layers size={13} />
             </button>
 
-            {/* Minimize / Expand (Only in PiP mode) */}
-            {isPipMode && (
-              <button
-                type="button"
-                onClick={() => updateMinimizedState(!isMinimized)}
-                className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all cursor-pointer"
-                title={isMinimized ? "Expandir painel (Ctrl)" : "Minimizar painel (Ctrl)"}
-              >
-                {isMinimized ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
-              </button>
-            )}
-
             <div className="h-4 w-[1px] bg-gray-200 mx-0.5"></div>
 
             {/* Close */}
