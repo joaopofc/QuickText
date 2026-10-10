@@ -700,6 +700,21 @@ export default function QuickFillModal({
     }
   }, [isMinimized, externalPipWindow]);
 
+  const updateMinimizedState = (minimized: boolean) => {
+    setIsMinimized(minimized);
+    if (externalPipWindow) {
+      try {
+        if (minimized) {
+          externalPipWindow.resizeTo(320, 85);
+        } else {
+          externalPipWindow.resizeTo(480, 620);
+        }
+      } catch (e) {
+        console.warn('Could not resize external PiP window:', e);
+      }
+    }
+  };
+
   const startExternalPip = async () => {
     if (!('documentPictureInPicture' in window)) {
       alert('Seu navegador não oferece suporte nativo ao Picture-in-Picture de Documentos. Para que flutue sobre qualquer outra aba ou aplicativo do computador, use o Google Chrome ou Microsoft Edge!');
@@ -707,7 +722,7 @@ export default function QuickFillModal({
     }
 
     try {
-      setIsMinimized(false);
+      updateMinimizedState(false);
       // Close any existing one
       if (externalPipWindow) {
         externalPipWindow.close();
@@ -937,7 +952,7 @@ export default function QuickFillModal({
             startExternalPip();
           } else {
             // Open -> Toggle minimize/expand (Do NOT copy)
-            setIsMinimized((prev) => !prev);
+            updateMinimizedState(!isMinimized);
           }
         }
         ctrlPressedRef.current = false;
@@ -1006,7 +1021,7 @@ export default function QuickFillModal({
       if (isPipMode || externalPipWindow) {
         setTimeout(() => {
           setCopied(false);
-          setIsMinimized(true); // Minimize to a floating button/pill in PiP mode
+          updateMinimizedState(true); // Minimize to a floating button/pill in PiP mode
         }, 1000);
       } else {
         setTimeout(() => {
@@ -1184,7 +1199,7 @@ export default function QuickFillModal({
         <div className="bg-black text-white h-screen w-screen flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
           <button
             type="button"
-            onClick={() => setIsMinimized(false)}
+            onClick={() => updateMinimizedState(false)}
             className="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer text-white hover:text-gray-200 transition-all focus:outline-hidden truncate flex-1 mr-2 text-left"
             title="Expandir Assistente"
           >
@@ -1195,7 +1210,7 @@ export default function QuickFillModal({
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
-              onClick={() => setIsMinimized(false)}
+              onClick={() => updateMinimizedState(false)}
               className="px-2 py-0.5 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-[10px] rounded-md border border-neutral-700 transition-all cursor-pointer"
             >
               Restaurar
@@ -1653,7 +1668,7 @@ export default function QuickFillModal({
             {isPipMode && (
               <button
                 type="button"
-                onClick={() => setIsMinimized(!isMinimized)}
+                onClick={() => updateMinimizedState(!isMinimized)}
                 className="p-1.5 text-gray-400 hover:text-black hover:bg-gray-100 rounded-md transition-all cursor-pointer"
                 title={isMinimized ? "Expandir painel (Ctrl)" : "Minimizar painel (Ctrl)"}
               >
