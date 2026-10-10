@@ -670,78 +670,59 @@ export default function QuickFillModal({
     };
   }, [externalPipWindow]);
 
-  useEffect(() => {
-    if (externalPipWindow) {
-      try {
-        const body = externalPipWindow.document.body;
-        const html = externalPipWindow.document.documentElement;
-        html.style.margin = '0';
-        html.style.padding = '0';
-        body.style.margin = '0';
-        body.style.padding = '0';
-        body.style.overflow = 'hidden';
-
-        if (isMinimized) {
-          body.style.backgroundColor = '#000000';
-          body.style.color = '#ffffff';
-          html.style.width = '320px';
-          html.style.height = '85px';
-          body.style.width = '320px';
-          body.style.height = '85px';
-          externalPipWindow.resizeTo(320, 85);
-        } else {
-          body.style.backgroundColor = '#ffffff';
-          body.style.color = '#0b0f19';
-          html.style.width = '100%';
-          html.style.height = '100%';
-          body.style.width = '100%';
-          body.style.height = '100%';
-          externalPipWindow.resizeTo(480, 620);
-        }
-      } catch (e) {
-        console.warn('Could not resize external PiP window:', e);
-      }
-    }
-  }, [isMinimized, externalPipWindow]);
-
   const updateMinimizedState = (minimized: boolean) => {
-    setIsMinimized(minimized);
-    if (externalPipWindow) {
-      try {
-        const body = externalPipWindow.document.body;
-        const html = externalPipWindow.document.documentElement;
-        if (minimized) {
-          if (html) { html.style.width = '320px'; html.style.height = '85px'; }
-          if (body) { body.style.width = '320px'; body.style.height = '85px'; }
-          externalPipWindow.resizeTo(320, 85);
-        } else {
-          if (html) { html.style.width = '100%'; html.style.height = '100%'; }
-          if (body) { body.style.width = '100%'; body.style.height = '100%'; }
-          externalPipWindow.resizeTo(480, 620);
-        }
-      } catch (e) {
-        console.warn('Could not resize external PiP window:', e);
-      }
-    }
+    startExternalPip(minimized);
   };
 
-  const startExternalPip = async () => {
+  const startExternalPip = async (minimizedState: boolean = false) => {
     if (!('documentPictureInPicture' in window)) {
       alert('Seu navegador não oferece suporte nativo ao Picture-in-Picture de Documentos. Para que flutue sobre qualquer outra aba ou aplicativo do computador, use o Google Chrome ou Microsoft Edge!');
       return;
     }
 
     try {
-      updateMinimizedState(false);
+      setIsMinimized(minimizedState);
       // Close any existing one
       if (externalPipWindow) {
-        externalPipWindow.close();
+        try {
+          externalPipWindow.close();
+        } catch (e) {
+          console.error(e);
+        }
+        setExternalPipWindow(null);
       }
 
+      const w = minimizedState ? 320 : 480;
+      const h = minimizedState ? 85 : 620;
+
       const pipWin = await (window as any).documentPictureInPicture.requestWindow({
-        width: 480,
-        height: 620,
+        width: w,
+        height: h,
       });
+
+      // Set document body & html style
+      try {
+        const body = pipWin.document.body;
+        const html = pipWin.document.documentElement;
+        html.style.margin = '0';
+        html.style.padding = '0';
+        html.style.width = '100%';
+        html.style.height = '100%';
+        body.style.margin = '0';
+        body.style.padding = '0';
+        body.style.width = '100%';
+        body.style.height = '100%';
+        body.style.overflow = 'hidden';
+        if (minimizedState) {
+          body.style.backgroundColor = '#000000';
+          body.style.color = '#ffffff';
+        } else {
+          body.style.backgroundColor = '#ffffff';
+          body.style.color = '#0b0f19';
+        }
+      } catch (e) {
+        console.warn('Could not set PiP body/html styles:', e);
+      }
 
       // Set custom title to avoid domain name showing
       try {
@@ -1236,7 +1217,7 @@ export default function QuickFillModal({
 
     if (isMinimized) {
       return (
-        <div className="bg-black text-white h-[85px] w-[320px] flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
+        <div className="bg-black text-white h-screen w-screen flex items-center justify-between px-3.5 py-1.5 font-sans overflow-hidden select-none antialiased border border-neutral-800">
           <button
             type="button"
             onClick={() => updateMinimizedState(false)}
