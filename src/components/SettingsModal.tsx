@@ -42,6 +42,7 @@ export default function SettingsModal({
   const [enableNativePip, setEnableNativePip] = useState(true);
   const [enableCtrlPipToggle, setEnableCtrlPipToggle] = useState(true);
   const [defaultPipTab, setDefaultPipTab] = useState<'fill' | 'preview'>('fill');
+  const [enableDirectPreviewEdit, setEnableDirectPreviewEdit] = useState(false);
 
   // Backup & Version states
   const [packageVersion, setPackageVersion] = useState<string>(() => getLocalTemplateVersion());
@@ -83,6 +84,7 @@ export default function SettingsModal({
           setEnableNativePip(parsed.enableNativePip !== false);
           setEnableCtrlPipToggle(parsed.enableCtrlPipToggle !== false);
           setDefaultPipTab(parsed.defaultPipTab === 'preview' ? 'preview' : 'fill');
+          setEnableDirectPreviewEdit(!!parsed.enableDirectPreviewEdit);
         }
       } catch (e) {
         console.error('Erro ao carregar configurações:', e);
@@ -101,18 +103,21 @@ export default function SettingsModal({
     enableNativePip?: boolean;
     enableCtrlPipToggle?: boolean;
     defaultPipTab?: 'fill' | 'preview';
+    enableDirectPreviewEdit?: boolean;
   }) => {
     const nextSettings = {
       autoOpenPip: updates.autoOpenPip !== undefined ? updates.autoOpenPip : autoOpenPip,
       enableNativePip: updates.enableNativePip !== undefined ? updates.enableNativePip : enableNativePip,
       enableCtrlPipToggle: updates.enableCtrlPipToggle !== undefined ? updates.enableCtrlPipToggle : enableCtrlPipToggle,
       defaultPipTab: updates.defaultPipTab !== undefined ? updates.defaultPipTab : defaultPipTab,
+      enableDirectPreviewEdit: updates.enableDirectPreviewEdit !== undefined ? updates.enableDirectPreviewEdit : enableDirectPreviewEdit,
     };
 
     if (updates.autoOpenPip !== undefined) setAutoOpenPip(updates.autoOpenPip);
     if (updates.enableNativePip !== undefined) setEnableNativePip(updates.enableNativePip);
     if (updates.enableCtrlPipToggle !== undefined) setEnableCtrlPipToggle(updates.enableCtrlPipToggle);
     if (updates.defaultPipTab !== undefined) setDefaultPipTab(updates.defaultPipTab);
+    if (updates.enableDirectPreviewEdit !== undefined) setEnableDirectPreviewEdit(updates.enableDirectPreviewEdit);
 
     localStorage.setItem('quick_text_settings', JSON.stringify(nextSettings));
   };
@@ -414,6 +419,32 @@ export default function SettingsModal({
               </div>
 
               <div className="h-[1px] bg-neutral-100/70" />
+
+              {/* Option: enableDirectPreviewEdit */}
+              <div className="flex items-center justify-between py-1">
+                <div className="pr-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[12px] font-semibold text-neutral-800 block">
+                      Editar direto na visualização do PiP
+                    </span>
+                    <span className="text-[9px] font-mono font-bold bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded border border-dashed border-amber-300">
+                      [[variável]]
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 font-normal leading-normal block mt-0.5 max-w-[220px]">
+                    Permite clicar diretamente nas variáveis dentro da caixa de texto para digitar
+                  </span>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer shrink-0 select-none">
+                  <input
+                    type="checkbox"
+                    checked={enableDirectPreviewEdit}
+                    onChange={(e) => handleSaveSettings({ enableDirectPreviewEdit: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-9 h-5.5 bg-neutral-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-3.5 after:content-[''] after:absolute after:top-[3px] after:left-[3px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-transform peer-checked:bg-neutral-900 shadow-3xs"></div>
+                </label>
+              </div>
 
               {/* Option 4: Modelos de Exemplo */}
               <div className="flex items-center justify-between py-1">

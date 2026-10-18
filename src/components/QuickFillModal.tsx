@@ -278,6 +278,8 @@ export function InteractiveDivInput({
   const ref = useRef<HTMLDivElement>(null);
   const lastQueriedCepRef = useRef<string>('');
   const [activeDropdownVar, setActiveDropdownVar] = useState<{ name: string; element: HTMLElement } | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number; maxWidth: number } | null>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [customInputValue, setCustomInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -339,6 +341,9 @@ export function InteractiveDivInput({
         ref.current.innerHTML = valueToHtml(filledText);
       }
       setSuccessMessage('✓ CEP consultado com sucesso!');
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 2500);
     } catch (err) {
       console.error(err);
       // Wait for the remaining 2 seconds even on error
@@ -420,6 +425,84 @@ export function InteractiveDivInput({
       setActiveDropdownVar(null);
     }
   };
+
+  // Position popover safely inside viewport bounds and handle click outside
+  useEffect(() => {
+    if (!activeDropdownVar) {
+      setPopoverPos(null);
+      return;
+    }
+
+    const updatePosition = () => {
+      const button = activeDropdownVar.element;
+      if (!button) return;
+      const doc = button.ownerDocument || document;
+      const win = doc.defaultView || window;
+      const rect = button.getBoundingClientRect();
+      const winWidth = win.innerWidth;
+      const winHeight = win.innerHeight;
+
+      const popoverWidth = Math.min(270, winWidth - 24);
+      const estimatedHeight = 240;
+
+      // Determine whether to open above or below
+      const spaceBelow = winHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const openUp = spaceBelow < estimatedHeight && spaceAbove > spaceBelow;
+
+      let top = openUp ? Math.max(12, rect.top - estimatedHeight - 6) : rect.bottom + 6;
+      let left = rect.left;
+
+      // Restrict horizontal bounds
+      if (left + popoverWidth > winWidth - 12) {
+        left = Math.max(12, winWidth - popoverWidth - 12);
+      }
+      if (left < 12) {
+        left = 12;
+      }
+
+      // Restrict vertical bounds
+      if (top + estimatedHeight > winHeight - 12) {
+        top = Math.max(12, winHeight - estimatedHeight - 12);
+      }
+      if (top < 12) {
+        top = 12;
+      }
+
+      setPopoverPos({
+        top,
+        left,
+        maxWidth: popoverWidth,
+      });
+    };
+
+    updatePosition();
+
+    const doc = activeDropdownVar.element.ownerDocument || document;
+    const win = doc.defaultView || window;
+
+    const handleReposition = () => updatePosition();
+    win.addEventListener('resize', handleReposition);
+    doc.addEventListener('scroll', handleReposition, true);
+
+    const handlePointerDownOutside = (e: MouseEvent) => {
+      if (
+        popoverRef.current && 
+        !popoverRef.current.contains(e.target as Node) && 
+        !activeDropdownVar.element.contains(e.target as Node)
+      ) {
+        setActiveDropdownVar(null);
+      }
+    };
+
+    doc.addEventListener('pointerdown', handlePointerDownOutside);
+
+    return () => {
+      win.removeEventListener('resize', handleReposition);
+      doc.removeEventListener('scroll', handleReposition, true);
+      doc.removeEventListener('pointerdown', handlePointerDownOutside);
+    };
+  }, [activeDropdownVar]);
 
   const handleSelectPreset = (preset: string) => {
     if (!activeDropdownVar || !ref.current) return;
@@ -510,36 +593,40 @@ export function InteractiveDivInput({
           }}
           style={{
             minHeight: isMultiline ? '58px' : '38px',
+            height: isMultiline ? 'auto' : '38px',
+            maxHeight: isMultiline ? '180px' : '38px',
             outline: 'none',
             WebkitUserSelect: 'text',
             userSelect: 'text',
+            whiteSpace: isMultiline ? 'pre-wrap' : 'pre',
+            wordBreak: isMultiline ? 'break-word' : 'normal',
+            overflowX: isMultiline ? 'hidden' : 'auto',
+            overflowY: isMultiline ? 'auto' : 'hidden',
           }}
-          className={`w-full bg-white border border-gray-200 focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
+          className={`w-full bg-white border border-gray-200 focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 rounded-lg px-3.5 text-xs text-gray-950 font-sans select-text cursor-text transition-all duration-150 ${
+            isMultiline 
+              ? 'py-2 leading-relaxed min-h-[58px] whitespace-pre-wrap break-words overflow-y-auto' 
+              : 'py-2 leading-[22px] h-[38px] whitespace-pre overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [scrollbar-width:none]'
+          } ${
             isLoading ? 'bg-neutral-50/80 cursor-not-allowed opacity-70 select-none' : ''
           } ${
-            isCepVar ? 'pr-28' : ''
-          } ${isMultiline ? 'min-h-[58px]' : ''}`}
+            isCepVar && isLoading ? 'pr-20' : ''
+          }`}
         />
         
-        {isCepVar && (
+        {isCepVar && isLoading && (
           <div className="absolute right-3.5 flex items-center gap-1.5 pointer-events-none select-none z-10">
-            {isLoading && (
-              <div className="flex items-center gap-1 text-[10px] text-neutral-400 font-sans">
-                <RefreshCw size={10} className="animate-spin text-gray-400" />
-                <span>Buscando...</span>
-              </div>
-            )}
-            {successMessage && !isLoading && (
-              <div className="flex items-center gap-1 text-[10px] text-emerald-600 font-sans font-semibold">
-                <Check size={11} className="text-emerald-500" />
-                <span>Pronto!</span>
-              </div>
-            )}
+            <div className="flex items-center gap-1 text-[10px] text-neutral-400 font-sans">
+              <RefreshCw size={10} className="animate-spin text-gray-400" />
+              <span>Buscando...</span>
+            </div>
           </div>
         )}
         
         {!value && (
-          <div className="absolute top-2.5 left-3.5 text-gray-400 text-xs font-sans pointer-events-none select-none">
+          <div className={`absolute left-3.5 text-gray-400 text-xs font-sans pointer-events-none select-none ${
+            isMultiline ? 'top-2.5' : 'top-1/2 -translate-y-1/2 truncate pr-8'
+          }`}>
             {placeholder}
           </div>
         )}
@@ -557,36 +644,44 @@ export function InteractiveDivInput({
         </div>
       )}
       
-      {/* Dropdown Popover */}
-      {activeDropdownVar && (
+      {/* Dropdown Popover (rendered via Portal to avoid overflow clipping and stay on top of all inputs) */}
+      {activeDropdownVar && popoverPos && ref.current && createPortal(
         <div
-          className="absolute z-50 bg-white border border-neutral-200 shadow-xl rounded-xl p-3 space-y-2.5 text-left font-sans text-xs min-w-[200px] max-w-xs animate-in fade-in slide-in-from-top-1 duration-150 text-neutral-900"
+          ref={popoverRef}
+          className="fixed z-[999999] bg-white border border-neutral-200 shadow-2xl rounded-xl p-3.5 space-y-2.5 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 text-neutral-900"
           style={{
-            top: `${activeDropdownVar.element.offsetTop + activeDropdownVar.element.offsetHeight + 4}px`,
-            left: `${Math.min((ref.current?.offsetWidth || 220) - 200, activeDropdownVar.element.offsetLeft)}px`,
+            top: `${popoverPos.top}px`,
+            left: `${popoverPos.left}px`,
+            width: `${popoverPos.maxWidth}px`,
+            maxWidth: 'calc(100vw - 24px)',
+            maxHeight: 'calc(100vh - 24px)',
           }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center justify-between border-b border-neutral-100 pb-1">
-            <span className="font-bold text-neutral-800 font-mono text-[9px] uppercase">Opções para: {activeDropdownVar.name}</span>
+          <div className="flex items-center justify-between border-b border-neutral-100 pb-1.5">
+            <span className="font-bold text-neutral-800 font-mono text-[9px] uppercase tracking-wide truncate pr-2">
+              Opções para: {activeDropdownVar.name}
+            </span>
             <button
               type="button"
               onClick={() => setActiveDropdownVar(null)}
-              className="text-neutral-400 hover:text-neutral-900 cursor-pointer"
+              className="text-neutral-400 hover:text-neutral-900 p-0.5 rounded hover:bg-neutral-100 cursor-pointer transition-colors"
+              title="Fechar"
             >
-              <X size={10} />
+              <X size={12} />
             </button>
           </div>
 
           {presets.length > 0 && (
             <div className="space-y-1">
               <span className="block text-[8px] font-bold font-mono text-neutral-400 uppercase tracking-wider">Escolher da lista:</span>
-              <div className="flex flex-col gap-1 max-h-28 overflow-y-auto pr-1">
+              <div className="flex flex-col gap-1 max-h-36 overflow-y-auto pr-1">
                 {presets.map((preset, pIdx) => (
                   <button
                     key={pIdx}
                     type="button"
                     onClick={() => handleSelectPreset(preset)}
-                    className="w-full text-left px-2 py-1 bg-neutral-50 hover:bg-neutral-950 hover:text-white rounded transition-all font-sans text-[10px] truncate border border-neutral-200/40 cursor-pointer text-neutral-700 font-medium"
+                    className="w-full text-left px-2.5 py-1.5 bg-neutral-50 hover:bg-neutral-950 hover:text-white rounded-md transition-all font-sans text-[11px] truncate border border-neutral-200/50 cursor-pointer text-neutral-800 font-medium active:scale-[0.98]"
                     title={preset}
                   >
                     {preset}
@@ -596,34 +691,163 @@ export function InteractiveDivInput({
             </div>
           )}
 
-          <div className="space-y-1 pt-1 border-t border-neutral-50">
+          <div className="space-y-1 pt-1.5 border-t border-neutral-100">
             <span className="block text-[8px] font-bold font-mono text-neutral-400 uppercase tracking-wider">Ou digitar valor:</span>
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               <input
                 type="text"
                 value={customInputValue}
                 onChange={(e) => setCustomInputValue(e.target.value)}
-                placeholder="Digite aqui..."
+                placeholder="Digite o valor..."
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
                     handleCustomInputSubmit();
                   }
                 }}
-                className="flex-1 px-2 py-1 bg-white text-[10px] text-neutral-850 border border-neutral-200 rounded focus:border-neutral-950 focus:outline-hidden"
+                className="flex-1 px-2.5 py-1 bg-white text-xs text-neutral-900 border border-neutral-200 rounded-md focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200"
               />
               <button
                 type="button"
                 onClick={handleCustomInputSubmit}
-                className="px-2 py-1 bg-neutral-950 text-white font-bold text-[9px] rounded cursor-pointer"
+                className="px-2.5 py-1 bg-neutral-950 text-white font-bold text-[10px] rounded-md cursor-pointer hover:bg-neutral-800 transition-colors shrink-0"
               >
                 OK
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        (ref.current.ownerDocument || document).body
       )}
     </div>
+  );
+}
+
+interface InlineVariableChipProps {
+  varName: string;
+  isCurly: boolean;
+  value: string;
+  onChange: (val: string) => void;
+  presets?: string[];
+}
+
+function InlineVariableChip({
+  varName,
+  isCurly,
+  value,
+  onChange,
+  presets = [],
+}: InlineVariableChipProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [showPresetsMenu, setShowPresetsMenu] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!showPresetsMenu) return;
+    const handleOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setShowPresetsMenu(false);
+      }
+    };
+    document.addEventListener('pointerdown', handleOutside);
+    return () => document.removeEventListener('pointerdown', handleOutside);
+  }, [showPresetsMenu]);
+
+  const badgeText = isCurly ? `{{${varName}}}` : `[[${varName}]]`;
+
+  if (!isEditing && !value) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsEditing(true)}
+        className="inline-flex items-center gap-0.5 px-1.5 py-0.5 mx-0.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-dashed border-amber-300 hover:border-amber-400 rounded-md text-[0.85em] font-bold font-mono align-baseline cursor-pointer shadow-3xs select-none transition-all group active:scale-[0.98]"
+        title={`Clique para digitar ${varName}`}
+      >
+        <span>{badgeText}</span>
+        <span className="text-[9px] text-amber-500 opacity-60 group-hover:opacity-100">✎</span>
+      </button>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center align-baseline mx-0.5 relative group/inlinechip">
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        placeholder={badgeText}
+        onChange={(e) => onChange(e.target.value)}
+        onFocus={() => setIsEditing(true)}
+        onBlur={() => {
+          if (!value.trim()) {
+            setIsEditing(false);
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            const doc = e.currentTarget.ownerDocument || document;
+            const allInputs = Array.from(doc.querySelectorAll('.inline-preview-var-input')) as HTMLInputElement[];
+            const idx = allInputs.indexOf(e.currentTarget);
+            if (idx >= 0 && idx < allInputs.length - 1) {
+              allInputs[idx + 1].focus();
+            } else {
+              e.currentTarget.blur();
+            }
+          }
+        }}
+        style={{
+          width: `${Math.max(badgeText.length + 1, (value ? value.length : badgeText.length) + 1.2)}ch`,
+          minWidth: '60px',
+          maxWidth: '100%',
+        }}
+        className={`inline-preview-var-input px-1.5 py-0.2 text-[0.95em] font-sans font-semibold rounded transition-all focus:outline-hidden ${
+          value
+            ? 'bg-emerald-50/90 text-emerald-900 border border-dashed border-emerald-300 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-200 shadow-3xs'
+            : 'bg-amber-50 text-amber-900 border border-dashed border-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-200'
+        }`}
+      />
+      {presets.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowPresetsMenu(prev => !prev)}
+          className="ml-0.5 text-gray-400 hover:text-black p-0.5 rounded cursor-pointer opacity-50 hover:opacity-100 transition-opacity"
+          title="Ver opções"
+        >
+          <ChevronDown size={10} />
+        </button>
+      )}
+      {showPresetsMenu && presets.length > 0 && (
+        <div
+          ref={menuRef}
+          className="absolute top-full mt-1 left-0 z-50 bg-white border border-gray-200 rounded-lg shadow-xl p-1.5 min-w-[140px] max-h-36 overflow-y-auto space-y-0.5 animate-in fade-in zoom-in-95 duration-100 text-left"
+        >
+          <div className="text-[8px] font-mono font-bold text-gray-400 uppercase px-1 pb-1 border-b border-gray-100">
+            Opções:
+          </div>
+          {presets.map((preset, pIdx) => (
+            <button
+              key={pIdx}
+              type="button"
+              onClick={() => {
+                onChange(preset);
+                setShowPresetsMenu(false);
+              }}
+              className="w-full text-left px-2 py-1 text-[10px] font-medium text-gray-700 hover:bg-black hover:text-white rounded transition-colors truncate"
+            >
+              {preset}
+            </button>
+          ))}
+        </div>
+      )}
+    </span>
   );
 }
 
