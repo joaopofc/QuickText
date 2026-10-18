@@ -514,7 +514,7 @@ export function InteractiveDivInput({
             WebkitUserSelect: 'text',
             userSelect: 'text',
           }}
-          className={`w-full bg-white border border-gray-200 focus:border-black focus:ring-1 focus:ring-black rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
+          className={`w-full bg-white border border-gray-200 focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 rounded-lg px-3.5 py-2 text-xs text-gray-950 font-sans leading-relaxed break-words whitespace-pre-wrap select-text cursor-text transition-all duration-150 ${
             isLoading ? 'bg-neutral-50/80 cursor-not-allowed opacity-70 select-none' : ''
           } ${
             isCepVar ? 'pr-28' : ''
@@ -697,6 +697,7 @@ export default function QuickFillModal({
   
   const handleIncreaseFont = () => setPreviewFontSize(prev => Math.min(24, prev + 1));
   const handleDecreaseFont = () => setPreviewFontSize(prev => Math.max(10, prev - 1));
+  const formatFontSizeDisplay = (size: number) => (size === 13 ? '12+1px' : `${size}px`);
 
   useEffect(() => {
     localStorage.setItem('quick_text_preview_font_family', previewFontFamily);
@@ -728,8 +729,9 @@ export default function QuickFillModal({
 
   const updateMinimizedState = (minimized: boolean) => {
     setIsMinimized(minimized);
-    if (externalPipWindow) {
+    if (externalPipWindow && !externalPipWindow.closed) {
       try {
+        externalPipWindow.focus();
         const w = minimized ? 320 : 480;
         const h = minimized ? 90 : 620;
         externalPipWindow.resizeTo(w, h);
@@ -742,6 +744,31 @@ export default function QuickFillModal({
         }
         if (html) {
           html.style.backgroundColor = minimized ? '#000000' : '#ffffff';
+        }
+
+        // Retry resize shortly after to ensure Chrome applies it smoothly
+        setTimeout(() => {
+          try {
+            if (externalPipWindow && !externalPipWindow.closed) {
+              externalPipWindow.focus();
+              externalPipWindow.resizeTo(w, h);
+            }
+          } catch {}
+        }, 50);
+
+        // When restoring to expanded state, automatically focus the first variable input
+        if (!minimized) {
+          setTimeout(() => {
+            try {
+              if (externalPipWindow && !externalPipWindow.closed) {
+                externalPipWindow.focus();
+                const firstInput = externalPipWindow.document.querySelector('input, [contenteditable="true"], [contenteditable="plaintext-only"]') as HTMLElement;
+                if (firstInput) {
+                  firstInput.focus();
+                }
+              }
+            } catch {}
+          }, 80);
         }
       } catch (err) {
         console.warn('Could not resize external PiP window:', err);
@@ -855,6 +882,24 @@ export default function QuickFillModal({
 
       setExternalPipWindow(pipWin);
       setIsPipMode(false);
+
+      // Automatically focus the PiP window and its first variable input
+      const focusPipWindowAndInput = () => {
+        try {
+          if (!pipWin || pipWin.closed) return;
+          pipWin.focus();
+          const firstInput = pipWin.document.querySelector('input, [contenteditable="true"], [contenteditable="plaintext-only"]') as HTMLElement;
+          if (firstInput) {
+            firstInput.focus();
+          }
+        } catch (e) {
+          console.warn('Could not focus PiP window/input:', e);
+        }
+      };
+
+      setTimeout(focusPipWindowAndInput, 60);
+      setTimeout(focusPipWindowAndInput, 180);
+      setTimeout(focusPipWindowAndInput, 350);
     } catch (err) {
       console.warn('Falha ao abrir Picture-in-Picture externo, ativando modo flutuante integrado:', err);
       // Fallback seamlessly to the in-page PiP floating mode
@@ -1504,7 +1549,7 @@ export default function QuickFillModal({
                               }
                             }}
                             onKeyDown={(e) => handleFieldKeyDown(e, varName, true)}
-                            className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs"
+                            className="w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 transition-all font-sans shadow-3xs"
                           />
                         </div>
                       ) : (
@@ -1597,8 +1642,8 @@ export default function QuickFillModal({
                   >
                     -
                   </button>
-                  <span className="px-1 text-[9px] font-bold font-mono text-gray-700 min-w-[20px] text-center">
-                    {previewFontSize}px
+                  <span className="px-1 text-[9px] font-bold font-mono text-gray-700 min-w-[34px] text-center">
+                    {formatFontSizeDisplay(previewFontSize)}
                   </span>
                   <button
                     type="button"
@@ -1965,7 +2010,7 @@ export default function QuickFillModal({
                                       }
                                     }}
                                     onKeyDown={(e) => handleFieldKeyDown(e, varName, true)}
-                                    className={`w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-3xs ${
+                                    className={`w-full px-3 py-1.5 bg-white text-xs text-gray-900 border border-gray-200 rounded-md focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 transition-all font-sans shadow-3xs ${
                                       isDate ? 'pr-9' : ''
                                     }`}
                                   />
@@ -2181,8 +2226,8 @@ export default function QuickFillModal({
                         >
                           -
                         </button>
-                        <span className="px-1 text-[9px] font-bold font-mono text-gray-700 min-w-[20px] text-center">
-                          {previewFontSize}px
+                        <span className="px-1 text-[9px] font-bold font-mono text-gray-700 min-w-[34px] text-center">
+                          {formatFontSizeDisplay(previewFontSize)}
                         </span>
                         <button
                           type="button"
@@ -2219,7 +2264,7 @@ export default function QuickFillModal({
                         </button>
                       </div>
 
-                      <div className="space-y-4 max-h-[45vh] overflow-y-auto pr-2">
+                      <div className="space-y-4 max-h-[45vh] overflow-y-auto p-1 pr-2">
                         {variables.map(varName => {
                           const isFilled = !!values[varName] && values[varName].trim() !== '';
                           const isMultiline = template ? isMultilineVariable(template.content, varName) : false;
@@ -2271,7 +2316,7 @@ export default function QuickFillModal({
                                       }}
                                       onKeyDown={(e) => handleFieldKeyDown(e, varName, true)}
                                       onFocus={() => setActiveFocusedVar(varName)}
-                                      className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-black focus:outline-hidden focus:ring-1 focus:ring-black transition-all font-sans shadow-2xs pr-10"
+                                      className="w-full px-3.5 py-2 bg-white text-sm text-gray-900 border border-gray-200 rounded-md focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 transition-all font-sans shadow-2xs pr-10"
                                     />
                                     <div className="absolute right-2 flex items-center">
                                       <button
@@ -2555,8 +2600,8 @@ export default function QuickFillModal({
                           >
                             -
                           </button>
-                          <span className="px-2 text-[10px] font-bold font-mono text-gray-700 min-w-[28px] text-center">
-                            {previewFontSize}px
+                          <span className="px-2 text-[10px] font-bold font-mono text-gray-700 min-w-[42px] text-center">
+                            {formatFontSizeDisplay(previewFontSize)}
                           </span>
                           <button
                             type="button"
@@ -2636,8 +2681,8 @@ export default function QuickFillModal({
                         >
                           -
                         </button>
-                        <span className="px-2 text-[10px] font-bold font-mono text-gray-700 min-w-[28px] text-center">
-                          {previewFontSize}px
+                        <span className="px-2 text-[10px] font-bold font-mono text-gray-700 min-w-[42px] text-center">
+                          {formatFontSizeDisplay(previewFontSize)}
                         </span>
                         <button
                           type="button"

@@ -109,7 +109,7 @@ export default function SearchDropdown({ templates, onSelect, disabled }: Search
               }
             }
           }}
-          className="w-full pl-10 pr-16 py-3 bg-white text-sm text-gray-900 border border-gray-200 rounded-lg shadow-2xs focus:border-black focus:outline-hidden transition-all duration-150 font-sans"
+          className="w-full pl-10 pr-16 py-3 bg-white text-sm text-gray-900 border border-gray-200 rounded-lg shadow-2xs focus:border-neutral-400 focus:outline-hidden focus:ring-1 focus:ring-neutral-200/60 transition-all duration-150 font-sans"
           disabled={disabled}
         />
         
