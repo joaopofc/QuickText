@@ -461,6 +461,7 @@ export default function App() {
           <div className="max-w-2xl mx-auto">
             <SearchDropdown
               templates={templates}
+              disabled={!!activeQuickFill || isFormOpen || isPrivacyOpen || isSettingsOpen || isPositionEditorOpen}
               onSelect={(template) => {
                 const vars = extractVariables(template.content);
                 if (vars.length > 0) {

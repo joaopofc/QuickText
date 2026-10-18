@@ -6,14 +6,20 @@ import { extractVariables } from '../utils/templateHelpers';
 interface SearchDropdownProps {
   templates: Template[];
   onSelect: (template: Template) => void;
+  disabled?: boolean;
 }
 
-export default function SearchDropdown({ templates, onSelect }: SearchDropdownProps) {
+export default function SearchDropdown({ templates, onSelect, disabled }: SearchDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const disabledRef = useRef(disabled);
   const [isMac, setIsMac] = useState(false);
+
+  useEffect(() => {
+    disabledRef.current = !!disabled;
+  }, [disabled]);
 
   // Detect platform on mount
   useEffect(() => {
@@ -34,8 +40,8 @@ export default function SearchDropdown({ templates, onSelect }: SearchDropdownPr
                        (document.activeElement as HTMLElement)?.isContentEditable;
       
       if (
-        (event.key === 'k' && (event.metaKey || event.ctrlKey)) ||
-        (event.key === '/' && !isTyping)
+        ((event.key === 'k' && (event.metaKey || event.ctrlKey)) ||
+        (event.key === '/' && !isTyping)) && !disabledRef.current
       ) {
         event.preventDefault();
         inputRef.current?.focus();
@@ -44,7 +50,7 @@ export default function SearchDropdown({ templates, onSelect }: SearchDropdownPr
       }
 
       // Start searching immediately when any normal printable character is typed
-      if (!isTyping && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      if (!isTyping && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey && !disabledRef.current) {
         event.preventDefault();
         setSearchQuery((prev) => prev + event.key);
         inputRef.current?.focus();
@@ -100,6 +106,7 @@ export default function SearchDropdown({ templates, onSelect }: SearchDropdownPr
             }
           }}
           className="w-full pl-10 pr-16 py-3 bg-white text-sm text-gray-900 border border-gray-200 rounded-lg shadow-2xs focus:border-black focus:outline-hidden transition-all duration-150 font-sans"
+          disabled={disabled}
         />
         
         {/* Shortcut badge / helper */}

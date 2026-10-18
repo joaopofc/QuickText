@@ -458,6 +458,14 @@ export function InteractiveDivInput({
           onInput={handleInput}
           onClick={handleClick}
           onFocus={onFocus}
+          onPaste={(e) => {
+            e.preventDefault();
+            const text = e.clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
+            if (ref.current) {
+              onChange(htmlToValue(ref.current));
+            }
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               if (!isMultiline) {
