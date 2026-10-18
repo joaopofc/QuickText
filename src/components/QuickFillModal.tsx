@@ -1445,7 +1445,7 @@ export default function QuickFillModal({
         {/* Form / Preview Body */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col min-h-0 bg-white">
           {pipTab === 'fill' ? (
-            <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+            <div className="flex-1 overflow-y-auto p-1 pr-1 space-y-4">
               {variables.length > 0 ? (
                 variables.map(varName => {
                   const isFilled = !!values[varName] && values[varName].trim() !== '';
@@ -1905,7 +1905,7 @@ export default function QuickFillModal({
               <div className="flex-1 flex flex-col min-h-0">
                 {pipTab === 'fill' ? (
                   /* Form Fields Tab */
-                  <div className="flex-1 overflow-y-auto pr-1 space-y-4">
+                  <div className="flex-1 overflow-y-auto p-1 pr-1 space-y-4">
                     {variables.length > 0 ? (
                       variables.map(varName => {
                         const isFilled = !!values[varName] && values[varName].trim() !== '';
