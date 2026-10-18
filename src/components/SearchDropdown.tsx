@@ -19,6 +19,10 @@ export default function SearchDropdown({ templates, onSelect, disabled }: Search
 
   useEffect(() => {
     disabledRef.current = !!disabled;
+    if (disabled) {
+      setIsOpen(false);
+      inputRef.current?.blur();
+    }
   }, [disabled]);
 
   // Detect platform on mount

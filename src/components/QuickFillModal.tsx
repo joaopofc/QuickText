@@ -445,6 +445,45 @@ export function InteractiveDivInput({
     }
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const rawText = e.clipboardData.getData('text/plain') || '';
+    if (!rawText) return;
+
+    // For single-line inputs, turn any newlines into spaces; for multiline, keep them
+    const cleanText = isMultiline ? rawText : rawText.replace(/\r?\n+/g, ' ');
+
+    const targetDoc = ref.current?.ownerDocument || document;
+    const targetWin = targetDoc.defaultView || window;
+    const sel = targetWin.getSelection();
+
+    if (sel && sel.rangeCount > 0 && ref.current) {
+      const range = sel.getRangeAt(0);
+      if (ref.current.contains(range.commonAncestorContainer)) {
+        range.deleteContents();
+        const textNode = targetDoc.createTextNode(cleanText);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.setEndAfter(textNode);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } else {
+        const textNode = targetDoc.createTextNode(cleanText);
+        ref.current.appendChild(textNode);
+        const newRange = targetDoc.createRange();
+        newRange.setStartAfter(textNode);
+        newRange.setEndAfter(textNode);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+      }
+    } else if (ref.current) {
+      const textNode = targetDoc.createTextNode(cleanText);
+      ref.current.appendChild(textNode);
+    }
+
+    handleInput();
+  };
+
   const presets = activeDropdownVar ? variablePresets[activeDropdownVar.name] || [] : [];
 
   return (
@@ -453,19 +492,12 @@ export function InteractiveDivInput({
         <div
           id={id}
           ref={ref}
-          contentEditable={!isLoading}
+          contentEditable={isLoading ? false : ('plaintext-only' as any)}
           suppressContentEditableWarning
           onInput={handleInput}
           onClick={handleClick}
           onFocus={onFocus}
-          onPaste={(e) => {
-            e.preventDefault();
-            const text = e.clipboardData.getData('text/plain');
-            document.execCommand('insertText', false, text);
-            if (ref.current) {
-              onChange(htmlToValue(ref.current));
-            }
-          }}
+          onPaste={handlePaste}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
               if (!isMultiline) {
@@ -811,14 +843,6 @@ export default function QuickFillModal({
         setExternalPipWindow(null);
         setIsMinimized(false);
         setIsPipMode(false);
-        setTimeout(() => {
-          const firstInput = document.querySelector('input, textarea, [tabindex="0"]') as HTMLElement;
-          if (firstInput) {
-            firstInput.focus();
-          } else {
-            window.focus();
-          }
-        }, 100);
       });
 
       setExternalPipWindow(pipWin);
@@ -843,14 +867,6 @@ export default function QuickFillModal({
       setExternalPipWindow(null);
     }
     onClose();
-    setTimeout(() => {
-      const firstInput = document.querySelector('input, textarea, [tabindex="0"]') as HTMLElement;
-      if (firstInput) {
-        firstInput.focus();
-      } else {
-        window.focus();
-      }
-    }, 100);
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
