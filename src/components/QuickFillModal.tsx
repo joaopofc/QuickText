@@ -806,11 +806,19 @@ export default function QuickFillModal({
         console.warn('Could not set PiP body/html styles:', e);
       }
 
-      // Set custom title to avoid domain name showing
+      // Set custom title and language to avoid domain name and Google Translate prompt
       try {
-        pipWin.document.title = "Texto Padrão (QuickText)";
+        pipWin.document.title = "Texto Padrão";
+        pipWin.document.documentElement.lang = 'pt-BR';
+        pipWin.document.documentElement.setAttribute('translate', 'no');
+        pipWin.document.documentElement.classList.add('notranslate');
+        pipWin.document.body.classList.add('notranslate');
+        const metaNotranslate = pipWin.document.createElement('meta');
+        metaNotranslate.name = 'google';
+        metaNotranslate.content = 'notranslate';
+        pipWin.document.head.appendChild(metaNotranslate);
       } catch (e) {
-        console.warn("Could not set Picture-in-Picture window title:", e);
+        console.warn("Could not set Picture-in-Picture window title/lang:", e);
       }
 
       // Copy page stylesheets to style the new PiP window perfectly
